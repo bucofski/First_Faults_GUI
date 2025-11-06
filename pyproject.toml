@@ -1,0 +1,10 @@
+[project]
+name = "first-faults-gui"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "flask[all]>=3.1.2",
+    "termine>=0.1.5",
+]
