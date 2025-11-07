@@ -18,18 +18,18 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('home') }}">First_Faults_GUI</a>
+    <a class="navbar-brand" href="{{ url_for('audit.home') }}">First_Faults_GUI</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topnav" aria-controls="topnav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="topnav">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link {% if title=='Home' %}active{% endif %}" href="{{ url_for('home') }}">Home</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='About' %}active{% endif %}" href="{{ url_for('about') }}">About</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='Contact' %}active{% endif %}" href="{{ url_for('contact') }}">Contact</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='Form' %}active{% endif %}" href="{{ url_for('form') }}">Form</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='Diagrams' %}active{% endif %}" href="{{ url_for('diagrams') }}">Diagrams</a></li>
-          <li class="nav-item"><a class="nav-link {% if title=='Table' %}active{% endif %}" href="{{ url_for('table') }}">Tables</a></li>
+        <li class="nav-item"><a class="nav-link {% if title=='Home' %}active{% endif %}" href="{{ url_for('audit.home') }}">Home</a></li>
+        <li class="nav-item"><a class="nav-link {% if title=='About' %}active{% endif %}" href="{{ url_for('audit.about') }}">About</a></li>
+        <li class="nav-item"><a class="nav-link {% if title=='Contact' %}active{% endif %}" href="{{ url_for('audit.contact') }}">Contact</a></li>
+        <li class="nav-item"><a class="nav-link {% if title=='Form' %}active{% endif %}" href="{{ url_for('audit.form') }}">Form</a></li>
+        <li class="nav-item"><a class="nav-link {% if title=='Diagrams' %}active{% endif %}" href="{{ url_for('audit.diagrams') }}">Diagrams</a></li>
+          <li class="nav-item"><a class="nav-link {% if title=='Table' %}active{% endif %}" href="{{ url_for('audit.table') }}">Tables</a></li>
       </ul>
     </div>
   </div>
