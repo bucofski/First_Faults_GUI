@@ -1,22 +1,49 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, get_flashed_messages
 
-app = Flask(__name__)
-app.secret_key = "replace_with_a_secure_random_key"  # required for flash
+from flask import (
+    Blueprint,
+    flash,
+    g,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for, get_flashed_messages,
+)
 
-@app.route("/")
+from business.services.diagram_service_view import DiagramService
+from business.services.plc_data_service import PLCDataService
+
+service= PLCDataService()
+bp = Blueprint("plc", __name__, url_prefix="/plc")
+
+
+@bp.route("/")
 def home():
     return render_template("home.html", title="Home")
 
-@app.route("/about")
+@bp.route("/table")
+def table():
+    return render_template("table.html", title="Table", data=service.get_plc_data())
+
+@bp.route("/about")
 def about():
     return render_template("about.html", title="About")
 
-@app.route("/contact")
+@bp.route("/contact")
 def contact():
     return render_template("contact.html", title="Contact")
 
+# Add a route to render diagrams page
+@bp.route("/diagrams")
+def diagrams():
+    chart_html = DiagramService.grouped_bar_chart_html()
+    chart_html2 = DiagramService.grouped_bar_chart_2_html()
+    pie_html = DiagramService.PieChart_html()
+    return render_template("diagrams.html", title="Diagrams", chart_html=chart_html, chart_2_html=chart_html2, pie_html=pie_html)
+
+
 # New form route
-@app.route("/form", methods=["GET", "POST"])
+@bp.route("/form", methods=["GET", "POST"])
 def form():
     if request.method == "POST":
         # Read fields
@@ -50,7 +77,7 @@ def form():
         # No errors → process (store/send/etc). Here we just flash the result.
         flash("Form submitted successfully.", "success")
         flash({"name": name, "email": email, "age": age, "topic": topic, "message": message}, "form-data")
-        return redirect(url_for("form"))
+        return redirect(url_for("plc.form"))
 
     # GET: render the form and pick up flashed data/messages
     flashed = get_flashed_messages(with_categories=True)
@@ -60,5 +87,3 @@ def form():
     form_data = form_data_items[0] if form_data_items else {}
     return render_template("form.html", title="Form", messages=messages, form_data=form_data)
 
-if __name__ == "__main__":
-    app.run(debug=True)
