@@ -1,7 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, get_flashed_messages
 
+from business.services.diagram_service_view import DiagramService
+
 app = Flask(__name__)
+app.jinja_options["autoescape"] = True
 app.secret_key = "replace_with_a_secure_random_key"  # required for flash
+
+
 
 @app.route("/")
 def home():
@@ -14,6 +19,13 @@ def about():
 @app.route("/contact")
 def contact():
     return render_template("contact.html", title="Contact")
+
+# Add a route to render diagrams page
+@app.route("/diagrams")
+def diagrams():
+    chart_html = DiagramService.grouped_bar_chart_html()
+    return render_template("diagrams.html", title="Diagrams", chart_html=chart_html)
+
 
 # New form route
 @app.route("/form", methods=["GET", "POST"])
