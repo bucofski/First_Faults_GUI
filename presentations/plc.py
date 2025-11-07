@@ -14,7 +14,7 @@ from business.services.diagram_service_view import DiagramService
 from business.services.plc_data_service import PLCDataService
 
 service= PLCDataService()
-bp = Blueprint("audit", __name__, url_prefix="/audit")
+bp = Blueprint("plc", __name__, url_prefix="/plc")
 
 
 @bp.route("/")
@@ -77,7 +77,7 @@ def form():
         # No errors → process (store/send/etc). Here we just flash the result.
         flash("Form submitted successfully.", "success")
         flash({"name": name, "email": email, "age": age, "topic": topic, "message": message}, "form-data")
-        return redirect(url_for("audit.form"))
+        return redirect(url_for("plc.form"))
 
     # GET: render the form and pick up flashed data/messages
     flashed = get_flashed_messages(with_categories=True)
