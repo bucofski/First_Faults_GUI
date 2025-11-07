@@ -1,16 +1,22 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, get_flashed_messages
 
 from business.services.diagram_service_view import DiagramService
+from business.services.plc_data_service import PLCDataService
 
 app = Flask(__name__)
 app.jinja_options["autoescape"] = True
 app.secret_key = "replace_with_a_secure_random_key"  # required for flash
+service= PLCDataService()
 
 
 
 @app.route("/")
 def home():
     return render_template("home.html", title="Home")
+
+@app.route("/table")
+def table():
+    return render_template("table.html", title="Table", data=service.get_plc_data())
 
 @app.route("/about")
 def about():

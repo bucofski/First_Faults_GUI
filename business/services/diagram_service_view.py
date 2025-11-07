@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.offline import plot
 
+
 class DiagramService:
     @staticmethod
     def grouped_bar_chart_html():
@@ -88,3 +89,5 @@ class DiagramService:
 
         # Return a full HTML snippet without including plotly.js again
         return plot(fig, include_plotlyjs=False, output_type='div')
+
+

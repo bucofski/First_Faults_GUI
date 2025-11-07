@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+
+<div style="margin: 12px 0; display:flex; gap:12px; flex-wrap:wrap;">
+  <input id="filter-text" type="text" placeholder="Filter by Tag/Unit/Quality…" />
+  <select id="filter-quality">
+    <option value="">All qualities</option>
+    <option value="GOOD">GOOD</option>
+    <option value="BAD">BAD</option>
+  </select>
+  <input id="filter-min" type="number" step="any" placeholder="Min value" />
+  <input id="filter-max" type="number" step="any" placeholder="Max value" />
+  <button id="clear-filters">Clear</button>
+</div>
+
+<table id="datagrid" class="table">
+  <thead>
+    <tr>
+      <th data-key="tag" class="sortable">Tag</th>
+      <th data-key="value" class="sortable">Value</th>
+      <th data-key="unit" class="sortable">Unit</th>
+      <th data-key="quality" class="sortable">Quality</th>
+      <th data-key="timestamp" class="sortable">Timestamp</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<style>
+  .table { width: 100%; border-collapse: collapse; }
+  .table th, .table td { border: 1px solid #ddd; padding: 8px; }
+  .table th { background: #f5f5f5; text-align: left; cursor: pointer; user-select: none; }
+  .good { background-color: #f0fff4; }
+  .bad { background-color: #fff5f5; }
+  .sortable::after { content: " ⬍"; color: #888; font-size: 0.9em; }
+  .sortable.asc::after { content: " ↑"; }
+  .sortable.desc::after { content: " ↓"; }
+</style>
+
+<script type="application/json" id="plc-data-json">
+  {{ data | tojson }}
+</script>
+
+<script>
+// Minimal, dependency-free datagrid with filter + sort
+(function() {
+  const raw = JSON.parse(document.getElementById('plc-data-json').textContent || '[]');
+  // Normalize timestamp to ISO strings for consistent sorting/formatting
+  const rows = raw.map(r => ({
+    tag: r.tag,
+    value: Number(r.value),
+    unit: r.unit || "",
+    quality: r.quality || "",
+    timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : null
+  }));
+
+  const tbody = document.querySelector('#datagrid tbody');
+  const ths = Array.from(document.querySelectorAll('#datagrid thead th.sortable'));
+
+  const ui = {
+    q: document.getElementById('filter-text'),
+    qual: document.getElementById('filter-quality'),
+    min: document.getElementById('filter-min'),
+    max: document.getElementById('filter-max'),
+    clear: document.getElementById('clear-filters')
+  };
+
+  let sort = { key: 'tag', dir: 'asc' };
+
+  function render(list) {
+    const fmt = (ts) => ts ? new Date(ts).toLocaleString() : '-';
+    const html = list.map(item => `
+      <tr class="${item.quality === 'BAD' ? 'bad' : 'good'}">
+        <td>${escapeHtml(item.tag)}</td>
+        <td>${Number.isFinite(item.value) ? item.value.toFixed(3) : '-'}</td>
+        <td>${escapeHtml(item.unit || '-')}</td>
+        <td>${escapeHtml(item.quality || '-')}</td>
+        <td>${fmt(item.timestamp)}</td>
+      </tr>
+    `).join('');
+    tbody.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
+
+  function applyFilters(data) {
+    const text = (ui.q.value || '').toLowerCase().trim();
+    const qFilter = ui.qual.value;
+    const minV = ui.min.value !== '' ? Number(ui.min.value) : null;
+    const maxV = ui.max.value !== '' ? Number(ui.max.value) : null;
+
+    return data.filter(r => {
+      if (text) {
+        const blob = `${r.tag} ${r.unit} ${r.quality}`.toLowerCase();
+        if (!blob.includes(text)) return false;
+      }
+      if (qFilter && r.quality !== qFilter) return false;
+      if (minV !== null && !(r.value >= minV)) return false;
+      if (maxV !== null && !(r.value <= maxV)) return false;
+      return true;
+    });
+  }
+
+  function applySort(data) {
+    const { key, dir } = sort;
+    const mul = dir === 'asc' ? 1 : -1;
+    return [...data].sort((a, b) => {
+      let av = a[key], bv = b[key];
+      if (key === 'timestamp') {
+        av = av ? Date.parse(av) : 0;
+        bv = bv ? Date.parse(bv) : 0;
+      }
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return (av - bv) * mul;
+      }
+      return String(av || '').localeCompare(String(bv || '')) * mul;
+    });
+  }
+
+  function update() {
+    const filtered = applyFilters(rows);
+    const sorted = applySort(filtered);
+    render(sorted);
+  }
+
+  function onSortClick(th) {
+    const key = th.getAttribute('data-key');
+    if (sort.key === key) {
+      sort.dir = sort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sort.key = key;
+      sort.dir = 'asc';
+      ths.forEach(h => h.classList.remove('asc','desc'));
+    }
+    ths.forEach(h => {
+      if (h.getAttribute('data-key') === sort.key) {
+        h.classList.toggle('asc', sort.dir === 'asc');
+        h.classList.toggle('desc', sort.dir === 'desc');
+      } else {
+        h.classList.remove('asc','desc');
+      }
+    });
+    update();
+  }
+
+  // Wire events
+  ths.forEach(th => th.addEventListener('click', () => onSortClick(th)));
+  [ui.q, ui.qual, ui.min, ui.max].forEach(el => el.addEventListener('input', update));
+  ui.clear.addEventListener('click', () => {
+    ui.q.value = '';
+    ui.qual.value = '';
+    ui.min.value = '';
+    ui.max.value = '';
+    sort = { key: 'tag', dir: 'asc' };
+    ths.forEach(h => h.classList.remove('asc','desc'));
+    update();
+  });
+
+  // Initial state
+  ths.find(h => h.getAttribute('data-key') === 'tag')?.classList.add('asc');
+  update();
+})();
+</script>
+{% endblock %}
