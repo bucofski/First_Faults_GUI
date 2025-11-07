@@ -24,7 +24,9 @@ def contact():
 @app.route("/diagrams")
 def diagrams():
     chart_html = DiagramService.grouped_bar_chart_html()
-    return render_template("diagrams.html", title="Diagrams", chart_html=chart_html)
+    chart_html2 = DiagramService.grouped_bar_chart_2_html()
+    pie_html = DiagramService.PieChart_html()
+    return render_template("diagrams.html", title="Diagrams", chart_html=chart_html, chart_2_html=chart_html2, pie_html=pie_html)
 
 
 # New form route

@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "flask[all]>=3.1.2",
+    "matplotlib>=3.10.7",
     "plotly[all]>=6.4.0",
     "termine>=0.1.5",
 ]
