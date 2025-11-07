@@ -2,10 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash, get
 
 from business.services.diagram_service_view import DiagramService
 from business.services.plc_data_service import PLCDataService
-
+import tomllib
 app = Flask(__name__)
 app.jinja_options["autoescape"] = True
 app.secret_key = "replace_with_a_secure_random_key"  # required for flash
+
+app.config.from_file("../config/config.toml", load=tomllib.load, text=False)
 service= PLCDataService()
 
 
