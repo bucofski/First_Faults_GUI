@@ -3,3 +3,5 @@
 ## project description
 
 A gui for cimplicity users to see historic first fault. Also reporting and analysing
+
+flask --app app run --debug
