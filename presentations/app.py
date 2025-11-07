@@ -1,6 +1,6 @@
 import tomllib
 
-from flask import Flask, Blueprint
+from flask import Flask, Blueprint, url_for, redirect
 
 from presentations import plc
 
@@ -15,5 +15,9 @@ def create_app() -> Flask:
     @app.route("/ping")
     def ping():
         return "pong"
+
+    @app.route("/")
+    def start():
+        return redirect(url_for("audit.home"))
 
     return app

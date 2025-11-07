@@ -87,5 +87,3 @@ def form():
     form_data = form_data_items[0] if form_data_items else {}
     return render_template("form.html", title="Form", messages=messages, form_data=form_data)
 
-if __name__ == "__main__":
-    app.run(debug=True)
