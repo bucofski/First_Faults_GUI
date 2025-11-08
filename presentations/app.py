@@ -41,9 +41,7 @@ def create_app() -> Flask:
 
     @app.route("/")
     def start():
-        # Try to redirect to a known endpoint; fall back to /ping if not present
         try:
-            # Adjust this to the real endpoint in your plc blueprint (e.g., "plc.home")
             return redirect(url_for("plc.home"))
         except Exception:
             return redirect(url_for("ping"))
