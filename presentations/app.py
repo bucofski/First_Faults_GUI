@@ -1,9 +1,11 @@
 import tomllib
 from pathlib import Path
 
-from flask import Flask, Blueprint, url_for, redirect
+from flask import Flask, url_for, redirect, session
 
 from presentations import plc
+from presentations.services.creadential import Role
+from presentations.services.credential_service import CredentialService
 
 
 def create_app() -> Flask:
@@ -12,10 +14,8 @@ def create_app() -> Flask:
     app.jinja_options["autoescape"] = True
     app.register_blueprint(plc.bp)
 
-    # Resolve config path robustly relative to this file
     config_path = (Path(__file__).resolve().parent.parent / "config" / "config.toml")
 
-    # Load config.toml with validation and defaults
     loaded = {}
     if config_path.is_file():
         with open(config_path, "rb") as f:
@@ -26,17 +26,20 @@ def create_app() -> Flask:
     app.config["SERVER_HOST"] = server_cfg.get("host", "127.0.0.1")
     app.config["SERVER_PORT"] = server_cfg.get("port", 5000)
 
+    @app.before_request
+    def ensure_session_credentials():
+        cred = CredentialService.get_current_credential()
+        if cred is not None:
+            session["username"] = cred.username
+            role_obj = cred.role
+            session["role"] = role_obj.value if role_obj is not None else Role.GUEST.value
+
     @app.route("/ping")
     def ping():
         return "pong"
 
     @app.route("/")
     def start():
-        # Try to redirect to a known endpoint; fall back to /ping if not present
-        try:
-            # Adjust this to the real endpoint in your plc blueprint (e.g., "plc.home")
-            return redirect(url_for("plc.home"))
-        except Exception:
-            return redirect(url_for("ping"))
+       return redirect(url_for("plc.home"))
 
     return app

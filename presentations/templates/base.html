@@ -5,34 +5,48 @@
     <title>{{ title }} First_Faults_GUI</title>
 
     <!-- Bootstrap CDN (quick, good-looking) -->
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
     <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-..."
-      crossorigin="anonymous"
+            crossorigin="anonymous"
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+            integrity="sha384-..."
+            rel="stylesheet"
     >
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('plc.home') }}">First_Faults_GUI</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topnav" aria-controls="topnav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="topnav">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link {% if title=='Home' %}active{% endif %}" href="{{ url_for('plc.home') }}">Home</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='About' %}active{% endif %}" href="{{ url_for('plc.about') }}">About</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='Contact' %}active{% endif %}" href="{{ url_for('plc.contact') }}">Contact</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='Form' %}active{% endif %}" href="{{ url_for('plc.form') }}">Form</a></li>
-        <li class="nav-item"><a class="nav-link {% if title=='Diagrams' %}active{% endif %}" href="{{ url_for('plc.diagrams') }}">Diagrams</a></li>
-          <li class="nav-item"><a class="nav-link {% if title=='Table' %}active{% endif %}" href="{{ url_for('plc.table') }}">Tables</a></li>
-      </ul>
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('plc.home') }}">First_Faults_GUI</a>
+        <button aria-controls="topnav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler"
+                data-bs-target="#topnav" data-bs-toggle="collapse" type="button">
+
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="topnav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link {% if title=='Home' %}active{% endif %}"
+                                        href="{{ url_for('plc.home') }}">Home</a></li>
+                <li class="nav-item"><a class="nav-link {% if title=='About' %}active{% endif %}"
+                                        href="{{ url_for('plc.about') }}">About</a></li>
+                <li class="nav-item"><a class="nav-link {% if title=='Contact' %}active{% endif %}"
+                                        href="{{ url_for('plc.contact') }}">Contact</a></li>
+                <li class="nav-item"><a class="nav-link {% if title=='Form' %}active{% endif %}"
+                                        href="{{ url_for('plc.form') }}">Form</a></li>
+                <li class="nav-item"><a class="nav-link {% if title=='Diagrams' %}active{% endif %}"
+                                        href="{{ url_for('plc.diagrams') }}">Diagrams</a></li>
+                <li class="nav-item"><a class="nav-link {% if title=='Table' %}active{% endif %}"
+                                        href="{{ url_for('plc.table') }}">Tables</a></li>
+                <li class="nav-item"><a class="nav-link {% if title=='Table Tree' %}active{% endif %}"
+                                        href="{{ url_for('plc.table_tree') }}">Tables</a></li>
+            </ul>
+            <span class="navbar-text ms-auto">
+            user : {{ session.username or 'Guest' }} &nbsp; Role : {{ session.role or 'GUEST' }}
+          </span>
+        </div>
+
     </div>
-  </div>
 </nav>
 
 <div class="container my-4">
@@ -40,6 +54,7 @@
 </div>
 
 <!-- Bootstrap JS (for navbar toggling) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-..." crossorigin="anonymous"></script>
+<script crossorigin="anonymous" integrity="sha384-..."
+        src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

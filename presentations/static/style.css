@@ -37,13 +37,17 @@ nav {
 
 /* small tweaks on top of Bootstrap */
 body {
-  background-color: #f8f9fa;
+    background-color: #f8f9fa;
 }
 
 /* make the left column form card a bit more narrow on wide screens */
 @media (min-width: 992px) {
-  .col-md-6 { max-width: 48%; }
+    .col-md-6 {
+        max-width: 48%;
+    }
 }
 
 /* small spacing for the result card */
-.card { margin-bottom: 1rem; }
+.card {
+    margin-bottom: 1rem;
+}

@@ -1,5 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.offline import plot
 
@@ -14,8 +12,10 @@ class DiagramService:
         women = [25, 32, 34, 20, 25]
 
         fig = go.Figure()
-        fig.add_bar(name='Men', x=groups, y=men, text=[str(v) for v in men], textposition='outside', marker_color='#1f77b4')
-        fig.add_bar(name='Women', x=groups, y=women, text=[str(v) for v in women], textposition='outside', marker_color='#ff7f0e')
+        fig.add_bar(name='Men', x=groups, y=men, text=[str(v) for v in men], textposition='outside',
+                    marker_color='#1f77b4')
+        fig.add_bar(name='Women', x=groups, y=women, text=[str(v) for v in women], textposition='outside',
+                    marker_color='#ff7f0e')
 
         fig.update_layout(
             barmode='group',
@@ -42,7 +42,7 @@ class DiagramService:
         }
 
         x = list(species)  # x-axis categories
-        width = 0.25  # unused with Plotly group mode but kept for clarity
+
 
         fig = go.Figure()
         for attribute, measurement in penguin_means.items():
@@ -69,7 +69,7 @@ class DiagramService:
         return plot(fig, include_plotlyjs=False, output_type='div')
 
     @staticmethod
-    def PieChart_html():
+    def pie_chart_html():
         # Sample data for pie chart
         labels = ['A', 'B', 'C', 'D', 'E']
         values = [20, 15, 30, 25, 10]
@@ -89,5 +89,3 @@ class DiagramService:
 
         # Return a full HTML snippet without including plotly.js again
         return plot(fig, include_plotlyjs=False, output_type='div')
-
-
