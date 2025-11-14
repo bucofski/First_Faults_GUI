@@ -164,4 +164,5 @@ cython_debug/
 #.idea/
 .idea/
 /.venv
-/config/Connection.yaml
+Firts_Fault_GUI/config/Connection.yaml
+uv.lock
