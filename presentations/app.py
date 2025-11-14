@@ -1,7 +1,7 @@
 import tomllib
 from pathlib import Path
 
-from flask import Flask, Blueprint, url_for, redirect, session
+from flask import Flask, url_for, redirect, session
 
 from presentations import plc
 from presentations.services.creadential import Role
@@ -15,7 +15,6 @@ def create_app() -> Flask:
     app.register_blueprint(plc.bp)
 
     config_path = (Path(__file__).resolve().parent.parent / "config" / "config.toml")
-
 
     loaded = {}
     if config_path.is_file():
@@ -41,11 +40,6 @@ def create_app() -> Flask:
 
     @app.route("/")
     def start():
-        # Try to redirect to a known endpoint; fall back to /ping if not present
-        try:
-            # Adjust this to the real endpoint in your plc blueprint (e.g., "plc.home")
-            return redirect(url_for("plc.home"))
-        except Exception:
-            return redirect(url_for("ping"))
+       return redirect(url_for("plc.home"))
 
     return app

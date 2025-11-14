@@ -8,6 +8,7 @@ class Role(Enum):
     GUEST = "guest"
     ANONYMOUS = "anonymous"
 
+
 @dataclass
 class Credential:
     username: str

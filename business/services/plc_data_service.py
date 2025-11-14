@@ -1,7 +1,7 @@
 # just for testing
 import dataclasses
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 from business.core.singleton import Singleton
 
@@ -12,7 +12,7 @@ class PlcData:
     value: float
     quality: str = "GOOD"
     unit: Optional[str] = None
-    timestamp: datetime = datetime.utcnow()
+    timestamp: datetime = dataclasses.field(default_factory=datetime.utcnow)
 
 
 class PLCDataService(metaclass=Singleton):
