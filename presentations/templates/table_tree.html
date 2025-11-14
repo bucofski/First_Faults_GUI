@@ -4,57 +4,79 @@
 <h1>{{ title or "Table Tree (1 level)" }}</h1>
 
 <table class="table" id="treegrid">
-  <thead>
+    <thead>
     <tr>
-      <th>Name</th>
-      <th>Status</th>
-      <th>Actions</th>
+        <th>Name</th>
+        <th>Status</th>
+        <th>Actions</th>
     </tr>
-  </thead>
-  <tbody>
-  {% for item in items %}
+    </thead>
+    <tbody>
+    {% for item in items %}
     <tr class="parent" data-parent-id="{{ item.id }}">
-      <td>
-        {% if item.children %}
-          <span class="toggle" data-target="{{ item.id }}">▶</span>
-        {% else %}
-          <span style="opacity:0.3;">•</span>
-        {% endif %}
-        {{ item.name }}
-      </td>
-      <td>{{ item.status }}</td>
-          <td>superman</td>
+        <td>
+            {% if item.children %}
+            <span class="toggle" data-target="{{ item.id }}">▶</span>
+            {% else %}
+            <span style="opacity:0.3;">•</span>
+            {% endif %}
+            {{ item.name }}
+        </td>
+        <td>{{ item.status }}</td>
+        <td>superman</td>
     </tr>
 
     {% for child in item.children %}
     <tr class="child child-of-{{ item.id }}" style="display:none;">
         <td class="indent" style="padding-left:40px;">{{ child.name }}</td>
-      <td>{{ child.status }}</td>
+        <td>{{ child.status }}</td>
         <td>{{ child.actions }}</td>
     </tr>
     {% endfor %}
-  {% endfor %}
-  </tbody>
+    {% endfor %}
+    </tbody>
 </table>
 
 <style>
-  .table { width:100%; border-collapse: collapse; }
-  .table th, .table td { border:1px solid #ddd; padding:8px; }
-  .table th { background:#f5f5f5; text-align:left; }
-  .toggle { cursor:pointer; user-select:none; margin-right:6px; }
-  .indent { padding-left:100px; }
-  tr.child { background:#fafafa; }
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table th, .table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+
+    .table th {
+        background: #f5f5f5;
+        text-align: left;
+    }
+
+    .toggle {
+        cursor: pointer;
+        user-select: none;
+        margin-right: 6px;
+    }
+
+    .indent {
+        padding-left: 100px;
+    }
+
+    tr.child {
+        background: #fafafa;
+    }
 </style>
 
 <script>
-  document.addEventListener("click", function (e) {
-    const t = e.target.closest(".toggle");
-    if (!t) return;
-    const id = t.getAttribute("data-target");
-    const rows = document.querySelectorAll(".child-of-" + id);
-    const isOpen = t.textContent.trim() === "▼";
-    rows.forEach(r => r.style.display = isOpen ? "none" : "");
-    t.textContent = isOpen ? "▶" : "▼";
-  });
+    document.addEventListener("click", function (e) {
+        const t = e.target.closest(".toggle");
+        if (!t) return;
+        const id = t.getAttribute("data-target");
+        const rows = document.querySelectorAll(".child-of-" + id);
+        const isOpen = t.textContent.trim() === "▼";
+        rows.forEach(r => r.style.display = isOpen ? "none" : "");
+        t.textContent = isOpen ? "▶" : "▼";
+    });
 </script>
 {% endblock %}

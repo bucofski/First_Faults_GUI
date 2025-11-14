@@ -1,19 +1,16 @@
-
 from flask import (
     Blueprint,
     flash,
-    g,
     redirect,
     render_template,
     request,
-    session,
     url_for, get_flashed_messages,
 )
 
 from business.services.diagram_service_view import DiagramService
 from business.services.plc_data_service import PLCDataService
 
-service= PLCDataService()
+service = PLCDataService()
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 
 
@@ -21,17 +18,21 @@ bp = Blueprint("plc", __name__, url_prefix="/plc")
 def home():
     return render_template("home.html", title="Home")
 
+
 @bp.route("/table")
 def table():
     return render_template("table.html", title="Table", data=service.get_plc_data())
+
 
 @bp.route("/about")
 def about():
     return render_template("about.html", title="About")
 
+
 @bp.route("/contact")
 def contact():
     return render_template("contact.html", title="Contact")
+
 
 # Add a route to render diagrams page
 @bp.route("/diagrams")
@@ -39,7 +40,9 @@ def diagrams():
     chart_html = DiagramService.grouped_bar_chart_html()
     chart_html2 = DiagramService.grouped_bar_chart_2_html()
     pie_html = DiagramService.PieChart_html()
-    return render_template("diagrams.html", title="Diagrams", chart_html=chart_html, chart_2_html=chart_html2, pie_html=pie_html)
+    return render_template("diagrams.html", title="Diagrams", chart_html=chart_html, chart_2_html=chart_html2,
+                           pie_html=pie_html)
+
 
 @bp.route("/table-tree")
 def table_tree():
@@ -137,4 +140,3 @@ def form():
     form_data_items = [m for cat, m in flashed if cat == "form-data"]
     form_data = form_data_items[0] if form_data_items else {}
     return render_template("form.html", title="Form", messages=messages, form_data=form_data)
-

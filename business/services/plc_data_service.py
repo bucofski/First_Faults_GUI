@@ -1,7 +1,7 @@
 # just for testing
 import dataclasses
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 from business.core.singleton import Singleton
 
