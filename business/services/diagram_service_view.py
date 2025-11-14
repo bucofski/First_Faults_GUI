@@ -42,7 +42,7 @@ class DiagramService:
         }
 
         x = list(species)  # x-axis categories
-        width = 0.25  # unused with Plotly group mode but kept for clarity
+
 
         fig = go.Figure()
         for attribute, measurement in penguin_means.items():
@@ -69,7 +69,7 @@ class DiagramService:
         return plot(fig, include_plotlyjs=False, output_type='div')
 
     @staticmethod
-    def PieChart_html():
+    def pie_chart_html():
         # Sample data for pie chart
         labels = ['A', 'B', 'C', 'D', 'E']
         values = [20, 15, 30, 25, 10]

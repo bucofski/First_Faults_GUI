@@ -40,9 +40,6 @@ def create_app() -> Flask:
 
     @app.route("/")
     def start():
-        try:
-            return redirect(url_for("plc.home"))
-        except Exception:
-            return redirect(url_for("ping"))
+       return redirect(url_for("plc.home"))
 
     return app

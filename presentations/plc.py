@@ -39,7 +39,7 @@ def contact():
 def diagrams():
     chart_html = DiagramService.grouped_bar_chart_html()
     chart_html2 = DiagramService.grouped_bar_chart_2_html()
-    pie_html = DiagramService.PieChart_html()
+    pie_html = DiagramService.pie_chart_html()
     return render_template("diagrams.html", title="Diagrams", chart_html=chart_html, chart_2_html=chart_html2,
                            pie_html=pie_html)
 
@@ -125,12 +125,16 @@ def form():
             for e in errors:
                 flash(e, "error")
             # preserve minimal form data by flashing a dict (or use session)
-            flash({"name": name, "email": email, "age": age, "topic": topic, "message": message}, "form-data")
+            flash(
+                f"Form submitted successfully: Name - {name}, Email - {email}, Age - {age}, Topic - {topic}, Message - {message}",
+                "success")
             return redirect(url_for("form"))
 
         # No errors → process (store/send/etc). Here we just flash the result.
         flash("Form submitted successfully.", "success")
-        flash({"name": name, "email": email, "age": age, "topic": topic, "message": message}, "form-data")
+        flash(
+            f"Form submitted successfully: Name - {name}, Email - {email}, Age - {age}, Topic - {topic}, Message - {message}",
+            "form-data")
         return redirect(url_for("plc.form"))
 
     # GET: render the form and pick up flashed data/messages
