@@ -6,13 +6,6 @@ from typing import Optional
 from business.core.singleton import Singleton
 
 
-@dataclasses.dataclass
-class PlcData:
-    tag: str
-    value: float
-    quality: str = "GOOD"
-    unit: Optional[str] = None
-    timestamp: datetime = dataclasses.field(default_factory=datetime.utcnow)
 
 
 class PLCDataService(metaclass=Singleton):
