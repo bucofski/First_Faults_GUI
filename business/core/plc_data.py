@@ -2,7 +2,7 @@ import dataclasses
 from datetime import datetime, timezone
 
 @dataclasses.dataclass
-class PlcMessage(slots=True, kw_only=True):
+class PlcMessage:
     id:float
     error_message: str
     error_nbr: str
