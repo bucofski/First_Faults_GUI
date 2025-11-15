@@ -25,7 +25,47 @@ CREATE TABLE plc_message_relation (
     CONSTRAINT CHK_plc_message_relation_parent_not_child
         CHECK (parent_id <> child_id)
 );
+
+DECLARE @counter INT = 1;
+WHILE @counter <= 20
+    BEGIN
+        INSERT INTO plc_message (error_message, error_nbr, error_type, bs_comment, vw_mnemonic)
+        VALUES ('Parent Error Message ' + CAST(@counter AS NVARCHAR(10)),
+                'ERR-P-' + RIGHT('000' + CAST(@counter AS NVARCHAR(3)), 3),
+                'ERROR',
+                'Parent Comment ' + CAST(@counter AS NVARCHAR(10)),
+                'PARENT_' + CAST(@counter AS NVARCHAR(10)));
+
+        -- Get the parent ID
+        DECLARE @parent_id BIGINT = SCOPE_IDENTITY();
+
+        -- Generate 20 child messages for each parent
+        DECLARE @child_counter INT = 1;
+        WHILE @child_counter <= 20
+            BEGIN
+                -- Insert child message
+                INSERT INTO plc_message (error_message, error_nbr, error_type, bs_comment, vw_mnemonic)
+                VALUES ('Child Error Message ' + CAST(@counter AS NVARCHAR(10)) + '-' +
+                        CAST(@child_counter AS NVARCHAR(10)),
+                        'ERR-C-' + RIGHT('000' + CAST(@child_counter AS NVARCHAR(3)), 3),
+                        'WARNING',
+                        'Child Comment ' + CAST(@counter AS NVARCHAR(10)) + '-' + CAST(@child_counter AS NVARCHAR(10)),
+                        'CHILD_' + CAST(@counter AS NVARCHAR(10)) + '_' + CAST(@child_counter AS NVARCHAR(10)));
+
+                -- Create relation between parent and child
+                INSERT INTO plc_message_relation (parent_id, child_id)
+                VALUES (@parent_id, SCOPE_IDENTITY());
+
+                SET @child_counter = @child_counter + 1;
+            END
+
+        SET @counter = @counter + 1;
+    END
 GO
+
+
+
+
 
 
 DECLARE @id BIGINT = 123;  -- example parent id
