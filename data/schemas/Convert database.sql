@@ -1,5 +1,5 @@
 -- ============================================================================
--- MIGRATION SCRIPT: TD2 to First_Fault (Fully Normalized) - ROBUST VERSION
+-- MIGRATION SCRIPT: TD2 to First_Fault (TEST - FIRST 5000 RECORDS)
 -- ============================================================================
 
 USE First_Fault;
@@ -17,7 +17,7 @@ IF OBJECT_ID('tempdb..#TempInterlockLog') IS NOT NULL DROP TABLE #TempInterlockL
 IF OBJECT_ID('tempdb..#TempConditionLog') IS NOT NULL DROP TABLE #TempConditionLog;
 IF OBJECT_ID('tempdb..#IDMapping') IS NOT NULL DROP TABLE #IDMapping;
 
-GO
+
 
 -- ========================================================================
 -- START MIGRATION
@@ -142,11 +142,11 @@ BEGIN TRY
     PRINT 'Condition Definitions migrated: ' + CAST(@RowCount AS NVARCHAR(10));
 
     -- ========================================================================
-    -- STEP 5: Prepare Interlock Log data with mapping (GUID SUPPORT)
+    -- STEP 5: Prepare Interlock Log data - FIRST 5000 RECORDS ONLY
     -- ========================================================================
-    PRINT 'Step 5: Preparing Interlock Log data with ID mapping...';
+    PRINT 'Step 5: Preparing Interlock Log data (TOP 5000)...';
 
-    SELECT
+    SELECT TOP 5000
         old_il.ID as Old_ID,  -- This is a GUID
         idef.INTERLOCK_DEF_ID,
         old_il.TIMESTAMP,
@@ -169,7 +169,7 @@ BEGIN TRY
 
     DECLARE @TempCount INT;
     SELECT @TempCount = COUNT(*) FROM #TempInterlockLog;
-    PRINT 'Temp tables created with ' + CAST(@TempCount AS NVARCHAR(10)) + ' records';
+    PRINT 'Temp tables created with ' + CAST(@TempCount AS NVARCHAR(10)) + ' records (LIMITED TO 5000)';
 
     -- ========================================================================
     -- STEP 6: Insert Interlock Log records and build ID mapping (GUID)
@@ -211,7 +211,7 @@ BEGIN TRY
 
         SET @Counter = @Counter + 1;
 
-        IF @Counter % 1000 = 0
+        IF @Counter % 500 = 0
             PRINT '  Progress: ' + CAST(@Counter AS NVARCHAR(10)) + ' / ' + CAST(@Total AS NVARCHAR(10));
 
         FETCH NEXT FROM interlock_cursor INTO @Old_ID_GUID;
@@ -288,7 +288,7 @@ BEGIN TRY
     -- ========================================================================
     PRINT '';
     PRINT '========================================================================';
-    PRINT 'MIGRATION SUMMARY: TD2 → First_Fault (Fully Normalized)';
+    PRINT 'MIGRATION SUMMARY: TD2 → First_Fault (TEST - 5000 Records)';
     PRINT '========================================================================';
     PRINT '';
 
@@ -310,15 +310,15 @@ BEGIN TRY
         WHERE UPSTREAM_INTERLOCK_LOG_ID IS NOT NULL;
 
     PRINT '--- SOURCE (TD2) ---';
-    PRINT 'Old Interlock Log Count: ' + CAST(@TD2_InterlockCount AS NVARCHAR(10));
-    PRINT 'Old Condition Log Count: ' + CAST(@TD2_ConditionCount AS NVARCHAR(10));
+    PRINT 'Total Interlock Log:       ' + CAST(@TD2_InterlockCount AS NVARCHAR(10));
+    PRINT 'Total Condition Log:       ' + CAST(@TD2_ConditionCount AS NVARCHAR(10));
     PRINT '';
-    PRINT '--- TARGET (First_Fault) ---';
+    PRINT '--- TARGET (First_Fault) - TEST RUN ---';
     PRINT 'PLCs:                      ' + CAST(@FF_PLCCount AS NVARCHAR(10));
     PRINT 'Text Definitions:          ' + CAST(@FF_TextDefCount AS NVARCHAR(10));
     PRINT 'Interlock Definitions:     ' + CAST(@FF_InterlockDefCount AS NVARCHAR(10));
     PRINT 'Condition Definitions:     ' + CAST(@FF_ConditionDefCount AS NVARCHAR(10));
-    PRINT 'Interlock Log Entries:     ' + CAST(@FF_InterlockLogCount AS NVARCHAR(10));
+    PRINT 'Interlock Log Entries:     ' + CAST(@FF_InterlockLogCount AS NVARCHAR(10)) + ' (MAX 5000)';
     PRINT 'Condition Log Entries:     ' + CAST(@FF_ConditionLogCount AS NVARCHAR(10));
     PRINT 'Upstream References:       ' + CAST(@FF_UpstreamCount AS NVARCHAR(10));
     PRINT '';
@@ -327,7 +327,8 @@ BEGIN TRY
     COMMIT TRANSACTION;
 
     PRINT '';
-    PRINT '✓ MIGRATION COMPLETED SUCCESSFULLY!';
+    PRINT '✓ TEST MIGRATION COMPLETED SUCCESSFULLY!';
+    PRINT '  (First 5000 interlock records only)';
     PRINT '';
 
 END TRY
@@ -360,3 +361,4 @@ BEGIN CATCH
     IF OBJECT_ID('tempdb..#IDMapping') IS NOT NULL DROP TABLE #IDMapping;
 
 END CATCH;
+
