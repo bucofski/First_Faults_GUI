@@ -1,5 +1,8 @@
 -- ============================================================================
--- MIGRATION SCRIPT: TD2 to First_Fault (TEST - FIRST 5000 RECORDS)
+-- MIGRATION SCRIPT: TD2 to First_Fault (CORRECTED - FIRST 5000 RECORDS)
+-- ============================================================================
+-- KEY FIX: CONDITION_DEFINITION now includes INTERLOCK_NUMBER
+-- This is necessary because TYPE+BIT_INDEX is only unique within each interlock
 -- ============================================================================
 
 USE First_Fault;
@@ -16,8 +19,6 @@ END
 IF OBJECT_ID('tempdb..#TempInterlockLog') IS NOT NULL DROP TABLE #TempInterlockLog;
 IF OBJECT_ID('tempdb..#TempConditionLog') IS NOT NULL DROP TABLE #TempConditionLog;
 IF OBJECT_ID('tempdb..#IDMapping') IS NOT NULL DROP TABLE #IDMapping;
-
-
 
 -- ========================================================================
 -- START MIGRATION
@@ -50,14 +51,14 @@ BEGIN TRY
 
     INSERT INTO First_Fault.dbo.TEXT_DEFINITION (MNEMONIC, MESSAGE)
     SELECT DISTINCT
-        ISNULL(MNEMONIC COLLATE Latin1_General_CI_AS, 'UNKNOWN') as MNEMONIC,
-        ISNULL(MESSAGE COLLATE Latin1_General_CI_AS, 'No message') as MESSAGE
+        MNEMONIC COLLATE Latin1_General_CI_AS as MNEMONIC,
+        MESSAGE COLLATE Latin1_General_CI_AS as MESSAGE
     FROM (
         SELECT DISTINCT
             MNEMONIC,
             MESSAGE
         FROM TD2.dbo.FF_INTERLOCK_LOG
-        WHERE MNEMONIC IS NOT NULL OR MESSAGE IS NOT NULL
+        WHERE MNEMONIC IS NOT NULL AND MESSAGE IS NOT NULL
 
         UNION
 
@@ -65,7 +66,7 @@ BEGIN TRY
             MNEMONIC,
             MESSAGE
         FROM TD2.dbo.FF_CONDITION_LOG
-        WHERE MNEMONIC IS NOT NULL OR MESSAGE IS NOT NULL
+        WHERE MNEMONIC IS NOT NULL AND MESSAGE IS NOT NULL
     ) AS AllTexts
     ORDER BY MNEMONIC, MESSAGE;
 
@@ -74,69 +75,86 @@ BEGIN TRY
 
     -- ========================================================================
     -- STEP 3: Populate INTERLOCK_DEFINITION
+    -- Uses the MOST RECENT (latest timestamp) text for each PLC+NUMBER
     -- ========================================================================
     PRINT 'Step 3: Migrating Interlock Definitions...';
 
-    ;WITH RankedInterlocks AS (
+    -- First, find the most recent text for each PLC+NUMBER combination
+    ;WITH LatestInterlockText AS (
         SELECT
-            p.PLC_ID,
+            il.PLC,
             il.NUMBER,
-            ISNULL(il.MNEMONIC COLLATE Latin1_General_CI_AS, 'UNKNOWN') as MNEMONIC,
-            ISNULL(il.MESSAGE COLLATE Latin1_General_CI_AS, 'No message') as MESSAGE,
+            il.MNEMONIC,
+            il.MESSAGE,
+            il.TIMESTAMP,
             ROW_NUMBER() OVER (
-                PARTITION BY p.PLC_ID, il.NUMBER
+                PARTITION BY il.PLC, il.NUMBER
                 ORDER BY il.TIMESTAMP DESC, il.ID DESC
             ) as RowNum
         FROM TD2.dbo.FF_INTERLOCK_LOG il
-        INNER JOIN First_Fault.dbo.PLC p ON il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
         WHERE il.NUMBER IS NOT NULL
+            AND il.MNEMONIC IS NOT NULL
+            AND il.MESSAGE IS NOT NULL
     )
     INSERT INTO First_Fault.dbo.INTERLOCK_DEFINITION (PLC_ID, NUMBER, TEXT_DEF_ID)
     SELECT
-        ri.PLC_ID,
-        ri.NUMBER,
+        p.PLC_ID,
+        lit.NUMBER,
         td.TEXT_DEF_ID
-    FROM RankedInterlocks ri
+    FROM LatestInterlockText lit
+    INNER JOIN First_Fault.dbo.PLC p
+        ON lit.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
     INNER JOIN First_Fault.dbo.TEXT_DEFINITION td
-        ON ri.MNEMONIC COLLATE Latin1_General_CI_AS = td.MNEMONIC
-        AND ri.MESSAGE COLLATE Latin1_General_CI_AS = td.MESSAGE
-    WHERE ri.RowNum = 1;
+        ON lit.MNEMONIC COLLATE Latin1_General_CI_AS = td.MNEMONIC
+        AND lit.MESSAGE COLLATE Latin1_General_CI_AS = td.MESSAGE
+    WHERE lit.RowNum = 1;  -- Only the most recent text
 
     SET @RowCount = @@ROWCOUNT;
     PRINT 'Interlock Definitions migrated: ' + CAST(@RowCount AS NVARCHAR(10));
 
     -- ========================================================================
     -- STEP 4: Populate CONDITION_DEFINITION
+    -- CRITICAL FIX: Now includes INTERLOCK_NUMBER in the definition
+    -- This is because TYPE+BIT_INDEX is only unique WITHIN each interlock
     -- ========================================================================
-    PRINT 'Step 4: Migrating Condition Definitions...';
+    PRINT 'Step 4: Migrating Condition Definitions (WITH INTERLOCK_NUMBER)...';
 
-    ;WITH RankedConditions AS (
+    -- First, find the most recent text for each PLC+INTERLOCK_NUMBER+TYPE+BIT_INDEX combination
+    ;WITH LatestConditionText AS (
         SELECT
-            p.PLC_ID,
+            il.PLC,
+            il.NUMBER as INTERLOCK_NUMBER,
             cl.TYPE,
             cl.BIT_INDEX,
-            ISNULL(cl.MNEMONIC COLLATE Latin1_General_CI_AS, 'UNKNOWN') as MNEMONIC,
-            ISNULL(cl.MESSAGE COLLATE Latin1_General_CI_AS, 'No message') as MESSAGE,
+            cl.MNEMONIC,
+            cl.MESSAGE,
+            il.TIMESTAMP,
             ROW_NUMBER() OVER (
-                PARTITION BY p.PLC_ID, cl.TYPE, cl.BIT_INDEX
+                PARTITION BY il.PLC, il.NUMBER, cl.TYPE, cl.BIT_INDEX
                 ORDER BY il.TIMESTAMP DESC, cl.ID DESC
             ) as RowNum
         FROM TD2.dbo.FF_CONDITION_LOG cl
         INNER JOIN TD2.dbo.FF_INTERLOCK_LOG il ON cl.INTERLOCK_REF = il.ID
-        INNER JOIN First_Fault.dbo.PLC p ON il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
-        WHERE cl.TYPE IS NOT NULL AND cl.BIT_INDEX IS NOT NULL
+        WHERE cl.TYPE IS NOT NULL
+            AND cl.BIT_INDEX IS NOT NULL
+            AND cl.MNEMONIC IS NOT NULL
+            AND cl.MESSAGE IS NOT NULL
+            AND il.NUMBER IS NOT NULL
     )
-    INSERT INTO First_Fault.dbo.CONDITION_DEFINITION (PLC_ID, TYPE, BIT_INDEX, TEXT_DEF_ID)
+    INSERT INTO First_Fault.dbo.CONDITION_DEFINITION (PLC_ID, INTERLOCK_NUMBER, TYPE, BIT_INDEX, TEXT_DEF_ID)
     SELECT
-        rc.PLC_ID,
-        rc.TYPE,
-        rc.BIT_INDEX,
+        p.PLC_ID,
+        lct.INTERLOCK_NUMBER,
+        lct.TYPE,
+        lct.BIT_INDEX,
         td.TEXT_DEF_ID
-    FROM RankedConditions rc
+    FROM LatestConditionText lct
+    INNER JOIN First_Fault.dbo.PLC p
+        ON lct.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
     INNER JOIN First_Fault.dbo.TEXT_DEFINITION td
-        ON rc.MNEMONIC COLLATE Latin1_General_CI_AS = td.MNEMONIC
-        AND rc.MESSAGE COLLATE Latin1_General_CI_AS = td.MESSAGE
-    WHERE rc.RowNum = 1;
+        ON lct.MNEMONIC COLLATE Latin1_General_CI_AS = td.MNEMONIC
+        AND lct.MESSAGE COLLATE Latin1_General_CI_AS = td.MESSAGE
+    WHERE lct.RowNum = 1;  -- Only the most recent text
 
     SET @RowCount = @@ROWCOUNT;
     PRINT 'Condition Definitions migrated: ' + CAST(@RowCount AS NVARCHAR(10));
@@ -147,22 +165,24 @@ BEGIN TRY
     PRINT 'Step 5: Preparing Interlock Log data (TOP 5000)...';
 
     SELECT TOP 5000
-        old_il.ID as Old_ID,  -- This is a GUID
+        old_il.ID as Old_ID,
         idef.INTERLOCK_DEF_ID,
         old_il.TIMESTAMP,
         old_il.TIMESTAMP_LOG,
         ISNULL(old_il.ORDER_LOG, 0) as ORDER_LOG
     INTO #TempInterlockLog
     FROM TD2.dbo.FF_INTERLOCK_LOG old_il
-    INNER JOIN First_Fault.dbo.PLC p ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
+    INNER JOIN First_Fault.dbo.PLC p
+        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
     INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
         ON p.PLC_ID = idef.PLC_ID
         AND old_il.NUMBER = idef.NUMBER
+    WHERE old_il.NUMBER IS NOT NULL  -- Only records with valid NUMBER
     ORDER BY old_il.TIMESTAMP, old_il.ID;
 
     -- ID mapping with GUID support
     SELECT
-        Old_ID,  -- GUID
+        Old_ID,
         CAST(NULL AS INT) as New_ID
     INTO #IDMapping
     FROM #TempInterlockLog;
@@ -172,7 +192,7 @@ BEGIN TRY
     PRINT 'Temp tables created with ' + CAST(@TempCount AS NVARCHAR(10)) + ' records (LIMITED TO 5000)';
 
     -- ========================================================================
-    -- STEP 6: Insert Interlock Log records and build ID mapping (GUID)
+    -- STEP 6: Insert Interlock Log records and build ID mapping
     -- ========================================================================
     PRINT 'Step 6: Inserting Interlock Log records...';
 
@@ -199,7 +219,7 @@ BEGIN TRY
             TIMESTAMP,
             TIMESTAMP_LOG,
             ORDER_LOG,
-            NULL
+            NULL  -- Will be updated in STEP 8
         FROM #TempInterlockLog
         WHERE Old_ID = @Old_ID_GUID;
 
@@ -223,7 +243,8 @@ BEGIN TRY
     PRINT 'Interlock Log records migrated: ' + CAST(@Counter AS NVARCHAR(10));
 
     -- ========================================================================
-    -- STEP 7: Populate FF_CONDITION_LOG and handle upstream references (GUID)
+    -- STEP 7: Populate FF_CONDITION_LOG
+    -- CRITICAL FIX: Now joins on INTERLOCK_NUMBER as well
     -- ========================================================================
     PRINT 'Step 7: Migrating Condition Log...';
 
@@ -237,21 +258,25 @@ BEGIN TRY
     FROM TD2.dbo.FF_CONDITION_LOG old_cl
     INNER JOIN #IDMapping map ON old_cl.INTERLOCK_REF = map.Old_ID
     INNER JOIN TD2.dbo.FF_INTERLOCK_LOG old_il ON old_cl.INTERLOCK_REF = old_il.ID
-    INNER JOIN First_Fault.dbo.PLC p ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
+    INNER JOIN First_Fault.dbo.PLC p
+        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
     INNER JOIN First_Fault.dbo.CONDITION_DEFINITION cdef
         ON p.PLC_ID = cdef.PLC_ID
+        AND old_il.NUMBER = cdef.INTERLOCK_NUMBER  -- FIX: Now includes INTERLOCK_NUMBER
         AND old_cl.TYPE = cdef.TYPE
         AND old_cl.BIT_INDEX = cdef.BIT_INDEX
     WHERE old_cl.INTERLOCK_REF IS NOT NULL
         AND old_cl.TYPE IS NOT NULL
         AND old_cl.BIT_INDEX IS NOT NULL;
 
+    -- Map upstream references
     UPDATE tcl
     SET Upstream_New_ID = map_upstream.New_ID
     FROM #TempConditionLog tcl
     INNER JOIN #IDMapping map_upstream ON tcl.UPSTREAM_INTERLOCK_REF = map_upstream.Old_ID
     WHERE tcl.UPSTREAM_INTERLOCK_REF IS NOT NULL;
 
+    -- Insert condition log entries
     INSERT INTO First_Fault.dbo.FF_CONDITION_LOG (INTERLOCK_LOG_ID, CONDITION_DEF_ID)
     SELECT DISTINCT
         New_Interlock_Log_ID,
@@ -262,7 +287,7 @@ BEGIN TRY
     PRINT 'Condition Log entries migrated: ' + CAST(@RowCount AS NVARCHAR(10));
 
     -- ========================================================================
-    -- STEP 8: Update upstream references
+    -- STEP 8: Update upstream interlock references
     -- ========================================================================
     PRINT 'Step 8: Updating upstream interlock references...';
 
@@ -329,6 +354,7 @@ BEGIN TRY
     PRINT '';
     PRINT '✓ TEST MIGRATION COMPLETED SUCCESSFULLY!';
     PRINT '  (First 5000 interlock records only)';
+    PRINT '  KEY FIX APPLIED: CONDITION_DEFINITION now includes INTERLOCK_NUMBER';
     PRINT '';
 
 END TRY
@@ -361,4 +387,3 @@ BEGIN CATCH
     IF OBJECT_ID('tempdb..#IDMapping') IS NOT NULL DROP TABLE #IDMapping;
 
 END CATCH;
-
