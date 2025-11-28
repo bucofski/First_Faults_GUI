@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine, text, String, Integer, DateTime, ForeignKey, URL, event
 from sqlalchemy.orm import Session, DeclarativeBase, relationship, Mapped, mapped_column
-from sqlalchemy.pool import NullPool
 from typing import Optional, Dict, Any
 import pandas as pd
 import pyodbc
