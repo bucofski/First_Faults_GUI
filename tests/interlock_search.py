@@ -1,6 +1,8 @@
 
+
 from DB_Connection import engine
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 import pandas as pd
 from typing import Optional
 from datetime import datetime
@@ -9,7 +11,7 @@ import os
 
 class InterlockAnalyzer:
     """
-    SQLAlchemy-based class for interlock root cause analysis.
+    SQLAlchemy 2.0-based class for interlock root cause analysis.
     Uses the fn_InterlockChainByDate SQL function with DBConnection engine.
     """
 
@@ -36,8 +38,8 @@ class InterlockAnalyzer:
                           ORDER BY Date DESC, TIMESTAMP DESC, Level;
                           """)
 
-        with self.engine.connect() as conn:
-            result = conn.execute(
+        with Session(self.engine) as session:
+            result = session.execute(
                 query_text,
                 {"interlock_number": interlock_number, "limit": limit}
             )
@@ -67,8 +69,8 @@ class InterlockAnalyzer:
                      ORDER BY COUNT(il.ID) DESC, idef.NUMBER;
                      """)
 
-        with self.engine.connect() as conn:
-            result = conn.execute(query)
+        with Session(self.engine) as session:
+            result = session.execute(query)
             df = pd.DataFrame(result.fetchall(), columns=result.keys())
 
         return df
@@ -81,8 +83,8 @@ class InterlockAnalyzer:
             bool: True if connection successful, False otherwise
         """
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text("SELECT @@VERSION AS Version, DB_NAME() AS CurrentDatabase"))
+            with Session(self.engine) as session:
+                result = session.execute(text("SELECT @@VERSION AS Version, DB_NAME() AS CurrentDatabase"))
                 row = result.fetchone()
                 print("✓ Connection successful!")
                 print(f"Database: {row.CurrentDatabase}")
