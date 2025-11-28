@@ -164,7 +164,7 @@ BEGIN TRY
     -- ========================================================================
     PRINT 'Step 5: Preparing Interlock Log data (TOP 5000)...';
 
-    SELECT TOP 5000
+    SELECT TOP 100000
         old_il.ID as Old_ID,
         idef.INTERLOCK_DEF_ID,
         old_il.TIMESTAMP,
@@ -343,7 +343,7 @@ BEGIN TRY
     PRINT 'Text Definitions:          ' + CAST(@FF_TextDefCount AS NVARCHAR(10));
     PRINT 'Interlock Definitions:     ' + CAST(@FF_InterlockDefCount AS NVARCHAR(10));
     PRINT 'Condition Definitions:     ' + CAST(@FF_ConditionDefCount AS NVARCHAR(10));
-    PRINT 'Interlock Log Entries:     ' + CAST(@FF_InterlockLogCount AS NVARCHAR(10)) + ' (MAX 5000)';
+    PRINT 'Interlock Log Entries:     ' + CAST(@FF_InterlockLogCount AS NVARCHAR(10)) + ' (MAX 100000)';
     PRINT 'Condition Log Entries:     ' + CAST(@FF_ConditionLogCount AS NVARCHAR(10));
     PRINT 'Upstream References:       ' + CAST(@FF_UpstreamCount AS NVARCHAR(10));
     PRINT '';
