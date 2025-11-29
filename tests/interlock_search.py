@@ -190,11 +190,6 @@ if __name__ == "__main__":
             output_dir='./output'
         )
 
-        # Alternative: Use individual methods
-        # results = analyzer.get_interlock_chain(121, limit=10)
-        # analyzer.print_analysis(results, 121)
-        # analyzer.save_results(results, 121, output_dir='./reports')
-
         end = datetime.now()
         print(f"\n✓ Execution time: {end - start}")
 
