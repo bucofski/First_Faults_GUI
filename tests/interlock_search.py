@@ -2,21 +2,41 @@ from DB_Connection import engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import pandas as pd
-from typing import Optional
+from typing import Optional, Protocol
 from datetime import datetime
+from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
 
 
-class InterlockAnalyzer:
+# Interface Segregation Principle - Define protocols for different responsibilities
+class DatabaseEngine(Protocol):
+    """Protocol for database engine"""
+
+    def connect(self): ...
+
+
+class InterlockRepository(ABC):
+    """Abstract base class for data access - Dependency Inversion Principle"""
+
+    @abstractmethod
+    def get_interlock_chain(self, interlock_number: int, limit: int) -> pd.DataFrame:
+        """Fetch interlock chain data"""
+        pass
+
+    @abstractmethod
+    def test_connection(self) -> bool:
+        """Test database connection"""
+        pass
+
+
+@dataclass
+class SQLAlchemyInterlockRepository(InterlockRepository):
     """
-    SQLAlchemy 2.0-based class for interlock root cause analysis.
-    Uses the fn_InterlockChainByDate SQL function with DBConnection engine.
+    Concrete implementation of InterlockRepository using SQLAlchemy.
+    Single Responsibility: Handle database operations only
     """
 
-    def __init__(self):
-        """
-        Initialize the analyzer using the DBConnection engine.
-        """
-        self.engine = engine
+    engine: object = field(default_factory=lambda: engine)
 
     def get_interlock_chain(self, interlock_number: int, limit: int = 1) -> pd.DataFrame:
         """
@@ -63,7 +83,23 @@ class InterlockAnalyzer:
             print(f"❌ Connection failed: {e}")
             return False
 
-    def print_analysis(self, df: pd.DataFrame, interlock_number: int):
+
+class ResultFormatter(ABC):
+    """Abstract base class for formatting results - Open/Closed Principle"""
+
+    @abstractmethod
+    def format(self, df: pd.DataFrame, interlock_number: int) -> None:
+        """Format and display results"""
+        pass
+
+
+@dataclass
+class ConsoleResultFormatter(ResultFormatter):
+    """
+    Single Responsibility: Format and print results to console
+    """
+
+    def format(self, df: pd.DataFrame, interlock_number: int) -> None:
         """
         Pretty print the root cause analysis results.
 
@@ -112,19 +148,27 @@ class InterlockAnalyzer:
                             print(
                                 f"{indent}  - Type {cond['TYPE']}, Bit {cond['BIT_INDEX']}: {cond['Condition_Message']}")
 
-    def show_results(self, df: pd.DataFrame, interlock_number: int, output_dir: Optional[str] = None):
+
+@dataclass
+class DictionaryResultFormatter(ResultFormatter):
+    """
+    Single Responsibility: Format results as dictionary/JSON structure
+    Open/Closed: Can add new formatters without modifying existing ones
+    """
+
+    output_dir: Optional[str] = None
+
+    def format(self, df: pd.DataFrame, interlock_number: int) -> dict:
         """
         Return results as a formatted object.
 
         Args:
             df: DataFrame with results
             interlock_number: The interlock number
-            output_dir: Output directory path (optional, not used)
 
         Returns:
             dict: Results as a structured dictionary object
         """
-        # Return results as a structured object
         results_object = {
             "interlock_number": interlock_number,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
@@ -133,6 +177,26 @@ class InterlockAnalyzer:
         }
 
         return results_object
+
+
+@dataclass
+class InterlockAnalyzer:
+    """
+    Main analyzer class following SOLID principles:
+    - Single Responsibility: Orchestrate analysis workflow
+    - Open/Closed: Can extend with new formatters/repositories without modification
+    - Liskov Substitution: Can substitute any InterlockRepository or ResultFormatter
+    - Interface Segregation: Depends only on abstract interfaces
+    - Dependency Inversion: Depends on abstractions, not concrete implementations
+    """
+
+    repository: InterlockRepository = field(default_factory=SQLAlchemyInterlockRepository)
+    console_formatter: ResultFormatter = field(default_factory=ConsoleResultFormatter)
+    dict_formatter: ResultFormatter = field(default_factory=DictionaryResultFormatter)
+
+    def test_connection(self) -> bool:
+        """Test the database connection"""
+        return self.repository.test_connection()
 
     def analyze_interlock(self, interlock_number: int, limit: int = 1,
                           save_to_file: bool = True, output_dir: Optional[str] = None) -> pd.DataFrame:
@@ -152,16 +216,20 @@ class InterlockAnalyzer:
         print(f"Root Cause Analysis for Interlock {interlock_number}")
         print(f"{'=' * 80}")
 
-        results = self.get_interlock_chain(interlock_number, limit)
+        results = self.repository.get_interlock_chain(interlock_number, limit)
 
         if results.empty:
             print(f"⚠️  No data found for interlock {interlock_number}")
             return results
 
-        self.print_analysis(results, interlock_number)
+        # Use console formatter
+        self.console_formatter.format(results, interlock_number)
 
         if save_to_file:
-            self.show_results(results, interlock_number, output_dir)
+            # Use dictionary formatter
+            if isinstance(self.dict_formatter, DictionaryResultFormatter):
+                self.dict_formatter.output_dir = output_dir
+            formatted_results = self.dict_formatter.format(results, interlock_number)
 
         return results
 
@@ -174,8 +242,12 @@ if __name__ == "__main__":
     try:
         start = datetime.now()
 
-        # Initialize analyzer (uses DBConnection engine automatically)
-        analyzer = InterlockAnalyzer()
+        # Initialize analyzer with dependency injection (SOLID principles)
+        analyzer = InterlockAnalyzer(
+            repository=SQLAlchemyInterlockRepository(),
+            console_formatter=ConsoleResultFormatter(),
+            dict_formatter=DictionaryResultFormatter(output_dir='./output')
+        )
 
         # Test connection
         print("Testing SQL Server connection...")
