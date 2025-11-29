@@ -1,12 +1,9 @@
-
-
 from DB_Connection import engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import pandas as pd
 from typing import Optional
 from datetime import datetime
-import os
 
 
 class InterlockAnalyzer:
@@ -43,34 +40,6 @@ class InterlockAnalyzer:
                 query_text,
                 {"interlock_number": interlock_number, "limit": limit}
             )
-            df = pd.DataFrame(result.fetchall(), columns=result.keys())
-
-        return df
-
-    def get_available_interlocks(self) -> pd.DataFrame:
-        """
-        Get list of all available interlocks in the database.
-
-        Returns:
-            pandas.DataFrame with interlock information
-        """
-        query = text("""
-                     SELECT DISTINCT idef.NUMBER       AS InterlockNumber,
-                                     p.PLC_CODE,
-                                     td.MNEMONIC,
-                                     td.MESSAGE,
-                                     COUNT(il.ID)      AS OccurrenceCount,
-                                     MAX(il.TIMESTAMP) AS LastOccurrence
-                     FROM dbo.INTERLOCK_DEFINITION idef
-                              INNER JOIN dbo.PLC p ON idef.PLC_ID = p.PLC_ID
-                              INNER JOIN dbo.TEXT_DEFINITION td ON idef.TEXT_DEF_ID = td.TEXT_DEF_ID
-                              LEFT JOIN dbo.FF_INTERLOCK_LOG il ON idef.INTERLOCK_DEF_ID = il.INTERLOCK_DEF_ID
-                     GROUP BY idef.NUMBER, p.PLC_CODE, td.MNEMONIC, td.MESSAGE
-                     ORDER BY COUNT(il.ID) DESC, idef.NUMBER;
-                     """)
-
-        with Session(self.engine) as session:
-            result = session.execute(query)
             df = pd.DataFrame(result.fetchall(), columns=result.keys())
 
         return df
@@ -143,35 +112,27 @@ class InterlockAnalyzer:
                             print(
                                 f"{indent}  - Type {cond['TYPE']}, Bit {cond['BIT_INDEX']}: {cond['Condition_Message']}")
 
-    def save_results(self, df: pd.DataFrame, interlock_number: int, output_dir: Optional[str] = None):
+    def show_results(self, df: pd.DataFrame, interlock_number: int, output_dir: Optional[str] = None):
         """
-        Save results to CSV and Excel files.
+        Return results as a formatted object.
 
         Args:
             df: DataFrame with results
             interlock_number: The interlock number
-            output_dir: Output directory path (default: current directory)
+            output_dir: Output directory path (optional, not used)
+
+        Returns:
+            dict: Results as a structured dictionary object
         """
-        if output_dir is None:
-            output_dir = os.getcwd()
+        # Return results as a structured object
+        results_object = {
+            "interlock_number": interlock_number,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "total_records": len(df),
+            "data": df.to_dict(orient='records')
+        }
 
-        os.makedirs(output_dir, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_filename = f'interlock_{interlock_number}_analysis_{timestamp}.csv'
-        xlsx_filename = f'interlock_{interlock_number}_analysis_{timestamp}.xlsx'
-
-        csv_path = os.path.join(output_dir, csv_filename)
-        xlsx_path = os.path.join(output_dir, xlsx_filename)
-
-        df.to_csv(csv_path, index=False)
-        print(f"✓ Results saved to: {csv_path}")
-
-        try:
-            df.to_excel(xlsx_path, index=False, sheet_name='Root Cause Analysis')
-            print(f"✓ Results saved to: {xlsx_path}")
-        except ImportError:
-            print("ℹ️  Install 'openpyxl' to export to Excel: uv add openpyxl")
+        return results_object
 
     def analyze_interlock(self, interlock_number: int, limit: int = 1,
                           save_to_file: bool = True, output_dir: Optional[str] = None) -> pd.DataFrame:
@@ -200,7 +161,7 @@ class InterlockAnalyzer:
         self.print_analysis(results, interlock_number)
 
         if save_to_file:
-            self.save_results(results, interlock_number, output_dir)
+            self.show_results(results, interlock_number, output_dir)
 
         return results
 
@@ -221,17 +182,10 @@ if __name__ == "__main__":
         if not analyzer.test_connection():
             exit(1)
 
-        # Get available interlocks
-        print("\n" + "=" * 80)
-        print("Available Interlocks (Top 20):")
-        print("=" * 80)
-        interlocks = analyzer.get_available_interlocks()
-        print(interlocks.head(20).to_string(index=False))
-
         # Analyze specific interlock
         results = analyzer.analyze_interlock(
-            interlock_number=121,
-            limit=1,
+            interlock_number=11222,
+            limit=5,
             save_to_file=True,
             output_dir='./output'
         )
