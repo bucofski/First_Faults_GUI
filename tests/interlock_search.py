@@ -1,5 +1,5 @@
-from DB_Connection import engine
-from sqlalchemy import text
+from DB_Connection import get_engine
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 import pandas as pd
 from typing import Optional, Protocol
@@ -36,7 +36,14 @@ class SQLAlchemyInterlockRepository(InterlockRepository):
     Single Responsibility: Handle database operations only
     """
 
-    engine: object = field(default_factory=lambda: engine)
+    engine: object = field(default_factory=get_engine)
+
+    # Define column names returned by the table-valued function
+    TVF_COLUMNS = (
+        "Date", "TIMESTAMP", "Level", "Interlock_Log_ID", "BSID",
+        "PLC", "Direction", "Interlock_Message", "Status",
+        "TYPE", "BIT_INDEX", "Condition_Message"
+    )
 
     def get_interlock_chain(self, interlock_number: int, limit: int = 1) -> pd.DataFrame:
         """
@@ -49,17 +56,23 @@ class SQLAlchemyInterlockRepository(InterlockRepository):
         Returns:
             pandas.DataFrame with the results
         """
-        query_text = text("""
-                          SELECT *
-                          FROM dbo.fn_InterlockChainByDate(:interlock_number, :limit)
-                          ORDER BY Date DESC, TIMESTAMP DESC, Level;
-                          """)
+        # Define the table-valued function
+        interlock_func = func.dbo.fn_InterlockChainByDate(
+            interlock_number, limit
+        ).table_valued(*self.TVF_COLUMNS)
+
+        # Build the query using SQLAlchemy select
+        stmt = (
+            select(interlock_func)
+            .order_by(
+                interlock_func.c.Date.desc(),
+                interlock_func.c.TIMESTAMP.desc(),
+                interlock_func.c.Level
+            )
+        )
 
         with Session(self.engine) as session:
-            result = session.execute(
-                query_text,
-                {"interlock_number": interlock_number, "limit": limit}
-            )
+            result = session.execute(stmt)
             df = pd.DataFrame(result.fetchall(), columns=result.keys())
 
         return df
@@ -73,11 +86,14 @@ class SQLAlchemyInterlockRepository(InterlockRepository):
         """
         try:
             with Session(self.engine) as session:
-                result = session.execute(text("SELECT @@VERSION AS Version, DB_NAME() AS CurrentDatabase"))
+                result = session.execute(
+                    select(
+                        func.db_name().label("CurrentDatabase")
+                    )
+                )
                 row = result.fetchone()
                 print("✓ Connection successful!")
                 print(f"Database: {row.CurrentDatabase}")
-                print(f"Version: {row.Version}")
                 return True
         except Exception as e:
             print(f"❌ Connection failed: {e}")
