@@ -7,7 +7,7 @@ GO
         il.ID,
         il.TIMESTAMP,
         il.UPSTREAM_INTERLOCK_LOG_ID,
-        p.PLC_CODE,
+        p.PLC_NAME,
         idef.NUMBER as BSID,
         td.MNEMONIC,
         td.MESSAGE,
@@ -26,7 +26,7 @@ GO
         upstream_il.ID,
         upstream_il.TIMESTAMP,
         upstream_il.UPSTREAM_INTERLOCK_LOG_ID,
-        p.PLC_CODE,
+        p.PLC_NAME,
         idef.NUMBER,
         td.MNEMONIC,
         td.MESSAGE,
@@ -39,7 +39,7 @@ GO
 )
 SELECT
     uc.Level,
-    uc.PLC_CODE,
+    uc.PLC_NAME,
     uc.BSID,
     uc.MESSAGE as Interlock_Message,
     cdef.TYPE as Condition_Type,

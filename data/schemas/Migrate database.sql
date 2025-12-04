@@ -33,9 +33,8 @@ BEGIN TRY
     -- ========================================================================
     PRINT 'Step 1: Migrating PLC data from TD2...';
 
-    INSERT INTO First_Fault.dbo.PLC (PLC_CODE, PLC_NAME)
+    INSERT INTO First_Fault.dbo.PLC (PLC_NAME)
     SELECT DISTINCT
-        PLC COLLATE Latin1_General_CI_AS as PLC_CODE,
         PLC COLLATE Latin1_General_CI_AS as PLC_NAME
     FROM TD2.dbo.FF_INTERLOCK_LOG
     WHERE PLC IS NOT NULL
@@ -103,7 +102,7 @@ BEGIN TRY
         td.TEXT_DEF_ID
     FROM LatestInterlockText lit
     INNER JOIN First_Fault.dbo.PLC p
-        ON lit.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
+        ON lit.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
     INNER JOIN First_Fault.dbo.TEXT_DEFINITION td
         ON lit.MNEMONIC COLLATE Latin1_General_CI_AS = td.MNEMONIC
         AND lit.MESSAGE COLLATE Latin1_General_CI_AS = td.MESSAGE
@@ -150,7 +149,7 @@ BEGIN TRY
         td.TEXT_DEF_ID
     FROM LatestConditionText lct
     INNER JOIN First_Fault.dbo.PLC p
-        ON lct.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
+        ON lct.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
     INNER JOIN First_Fault.dbo.TEXT_DEFINITION td
         ON lct.MNEMONIC COLLATE Latin1_General_CI_AS = td.MNEMONIC
         AND lct.MESSAGE COLLATE Latin1_General_CI_AS = td.MESSAGE
@@ -173,7 +172,7 @@ BEGIN TRY
     INTO #TempInterlockLog
     FROM TD2.dbo.FF_INTERLOCK_LOG old_il
     INNER JOIN First_Fault.dbo.PLC p
-        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
+        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
     INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
         ON p.PLC_ID = idef.PLC_ID
         AND old_il.NUMBER = idef.NUMBER
@@ -259,7 +258,7 @@ BEGIN TRY
     INNER JOIN #IDMapping map ON old_cl.INTERLOCK_REF = map.Old_ID
     INNER JOIN TD2.dbo.FF_INTERLOCK_LOG old_il ON old_cl.INTERLOCK_REF = old_il.ID
     INNER JOIN First_Fault.dbo.PLC p
-        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_CODE
+        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
     INNER JOIN First_Fault.dbo.CONDITION_DEFINITION cdef
         ON p.PLC_ID = cdef.PLC_ID
         AND old_il.NUMBER = cdef.INTERLOCK_NUMBER  -- FIX: Now includes INTERLOCK_NUMBER

@@ -27,8 +27,7 @@ GO
 -- ============================================================================
 CREATE TABLE PLC (
     PLC_ID INT PRIMARY KEY IDENTITY(1,1),
-    PLC_CODE NVARCHAR(50) NOT NULL UNIQUE,
-    PLC_NAME NVARCHAR(100),
+    PLC_NAME NVARCHAR(50) NOT NULL UNIQUE,
     DESCRIPTION NVARCHAR(255)
 );
 
