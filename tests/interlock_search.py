@@ -122,7 +122,7 @@ class InterlockTreeBuilder:
     @staticmethod
     def _build_chain_tree(chain_df: pd.DataFrame) -> Optional[InterlockNode]:
         """Build a tree from a single chain DataFrame."""
-        levels = sorted(chain_df["Level"].unique(), reverse=True)
+        levels = sorted(chain_df["Level"].unique(), reverse=False)
 
         if not levels:
             return None
@@ -448,7 +448,7 @@ def main(interlock_number: int, limit: int = 1):
 
 if __name__ == "__main__":
     # Configure your analysis parameters here
-    INTERLOCK_NUMBER = 11222
+    INTERLOCK_NUMBER = 11221
     LIMIT = 5
 
     exit(main(INTERLOCK_NUMBER, LIMIT))
