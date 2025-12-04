@@ -347,10 +347,10 @@ class InterlockAnalyzer:
         return self.repository.test_connection()
 
     def analyze_interlock(
-            self,
-            interlock_number: int,
-            limit: int = 1,
-            formatter: Optional[ResultFormatter] = None
+        self,
+        interlock_number: int,
+        limit: int = 1,
+        formatter: Optional[ResultFormatter] = None
     ) -> Any:
         """
         Perform complete interlock analysis.
@@ -384,8 +384,17 @@ class InterlockAnalyzer:
 # CLI Interface
 # ============================================================================
 
-def main():
-    """Command-line interface for interlock analysis."""
+def main(interlock_number: int, limit: int = 1):
+    """
+    Command-line interface for interlock analysis.
+
+    Args:
+        interlock_number: The interlock number to analyze
+        limit: Number of most recent occurrences to retrieve (default: 1)
+
+    Returns:
+        int: Exit code (0 for success, 1 for error)
+    """
     try:
         start_time = datetime.now()
 
@@ -398,10 +407,6 @@ def main():
         print("Testing SQL Server connection...")
         if not analyzer.test_connection():
             return 1
-
-        # Perform analysis
-        interlock_number = 11221
-        limit = 1
 
         # Get dictionary results
         results = analyzer.analyze_interlock(
@@ -442,4 +447,8 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    # Configure your analysis parameters here
+    INTERLOCK_NUMBER = 11222
+    LIMIT = 5
+
+    exit(main(INTERLOCK_NUMBER, LIMIT))
