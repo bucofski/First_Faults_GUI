@@ -415,10 +415,6 @@ def main(interlock_number: int, limit: int = 1):
             formatter=DictionaryResultFormatter()
         )
 
-        # Display results
-        print("\n" + "=" * 80)
-        print("HIERARCHICAL RESULT STRUCTURE:")
-        print("=" * 80)
         print(json.dumps(results, indent=2, default=str))
 
         # Also show console-friendly output

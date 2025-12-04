@@ -1,0 +1,318 @@
+[
+  {
+    "level": 0,
+    "interlock_log_id": 99598,
+    "bsid": "11221",
+    "plc": "TDS",
+    "direction": "ANCHOR",
+    "timestamp": "2025-03-11 18:27:50",
+    "interlock_message": "VrijgaveTrekOpbouw",
+    "status": "*** STARTING POINT ***",
+    "conditions": [
+      {
+        "type": 1,
+        "bit_index": 1,
+        "message": "Vrijgave TrekOpbouw WT1"
+      },
+      {
+        "type": 1,
+        "bit_index": 0,
+        "message": "Vrijgave TrekOpbouw Koppelzone  van"
+      },
+      {
+        "type": 1,
+        "bit_index": 3,
+        "message": "Vrijgave TrekOpbouw WT3"
+      },
+      {
+        "type": 1,
+        "bit_index": 5,
+        "message": "Vrijgave TrekOpbouw WT5"
+      },
+      {
+        "type": 1,
+        "bit_index": 2,
+        "message": "Vrijgave TrekOpbouw WT2"
+      },
+      {
+        "type": 1,
+        "bit_index": 4,
+        "message": "Vrijgave TrekOpbouw WT4"
+      }
+    ],
+    "children": [
+      {
+        "level": 1,
+        "interlock_log_id": 97873,
+        "bsid": "11222",
+        "plc": "TDS",
+        "direction": "UPSTREAM",
+        "timestamp": "2025-03-11 18:27:50",
+        "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+        "status": "",
+        "conditions": [
+          {
+            "type": 1,
+            "bit_index": 11,
+            "message": "Vrijgave TrekOpbouw Koppelzone van Trekregelingen"
+          }
+        ],
+        "children": [
+          {
+            "level": 2,
+            "interlock_log_id": 74391,
+            "bsid": "10122",
+            "plc": "TDS",
+            "direction": "UPSTREAM",
+            "timestamp": "2025-03-11 18:27:50",
+            "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Trekregeling",
+            "status": "*** ROOT CAUSE ***",
+            "conditions": [
+              {
+                "type": 1,
+                "bit_index": 2,
+                "message": "Overgang van Trekopbouw=>Aanlopen duurt te lang"
+              }
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "level": 0,
+    "interlock_log_id": 56499,
+    "bsid": "11221",
+    "plc": "TDS",
+    "direction": "ANCHOR",
+    "timestamp": "2025-03-11 18:25:43",
+    "interlock_message": "VrijgaveTrekOpbouw",
+    "status": "*** STARTING POINT ***",
+    "conditions": [
+      {
+        "type": 1,
+        "bit_index": 2,
+        "message": "Vrijgave TrekOpbouw WT2"
+      },
+      {
+        "type": 1,
+        "bit_index": 6,
+        "message": "Vrijgave TrekOpbouw Uitgang"
+      },
+      {
+        "type": 1,
+        "bit_index": 5,
+        "message": "Vrijgave TrekOpbouw WT5"
+      },
+      {
+        "type": 1,
+        "bit_index": 0,
+        "message": "Vrijgave TrekOpbouw Koppelzone  van"
+      },
+      {
+        "type": 1,
+        "bit_index": 1,
+        "message": "Vrijgave TrekOpbouw WT1"
+      },
+      {
+        "type": 1,
+        "bit_index": 3,
+        "message": "Vrijgave TrekOpbouw WT3"
+      },
+      {
+        "type": 1,
+        "bit_index": 4,
+        "message": "Vrijgave TrekOpbouw WT4"
+      }
+    ],
+    "children": [
+      {
+        "level": 1,
+        "interlock_log_id": 18105,
+        "bsid": "21214",
+        "plc": "TDS",
+        "direction": "UPSTREAM",
+        "timestamp": "2025-03-11 18:25:43",
+        "interlock_message": "VrijgaveTrekOpbouw_WT3",
+        "status": "",
+        "conditions": [
+          {
+            "type": 1,
+            "bit_index": 11,
+            "message": "Vrijgave TrekOpbouw WT3 van Trekregelingen"
+          }
+        ],
+        "children": [
+          {
+            "level": 2,
+            "interlock_log_id": 54851,
+            "bsid": "20112",
+            "plc": "TDS",
+            "direction": "UPSTREAM",
+            "timestamp": "2025-03-11 18:25:43",
+            "interlock_message": "Vrijgave_Trekopbouw_WT3_Trekregeling",
+            "status": "*** ROOT CAUSE ***",
+            "conditions": [
+              {
+                "type": 1,
+                "bit_index": 0,
+                "message": "Geen Bandbreukdetectie of slip in Tandem"
+              }
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "level": 0,
+    "interlock_log_id": 12359,
+    "bsid": "11221",
+    "plc": "TDS",
+    "direction": "ANCHOR",
+    "timestamp": "2025-03-11 14:59:48",
+    "interlock_message": "VrijgaveTrekOpbouw",
+    "status": "*** STARTING POINT ***",
+    "conditions": [
+      {
+        "type": 1,
+        "bit_index": 0,
+        "message": "Vrijgave TrekOpbouw Koppelzone  van"
+      }
+    ],
+    "children": [
+      {
+        "level": 1,
+        "interlock_log_id": 41052,
+        "bsid": "11222",
+        "plc": "TDS",
+        "direction": "UPSTREAM",
+        "timestamp": "2025-03-11 14:59:48",
+        "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+        "status": "",
+        "conditions": [
+          {
+            "type": 1,
+            "bit_index": 7,
+            "message": "Vrijgave TrekOpbouw Koppelzone van Machineposities"
+          }
+        ],
+        "children": [
+          {
+            "level": 2,
+            "interlock_log_id": 45537,
+            "bsid": "10118",
+            "plc": "TDS",
+            "direction": "UPSTREAM",
+            "timestamp": "2025-03-11 14:59:48",
+            "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Machineposities",
+            "status": "*** ROOT CAUSE ***",
+            "conditions": [
+              {
+                "type": 1,
+                "bit_index": 0,
+                "message": "Accu 3 niet voorbij positie leeg"
+              }
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "level": 0,
+    "interlock_log_id": 13533,
+    "bsid": "11221",
+    "plc": "TDS",
+    "direction": "ANCHOR",
+    "timestamp": "2025-03-11 14:14:55",
+    "interlock_message": "VrijgaveTrekOpbouw",
+    "status": "*** STARTING POINT ***",
+    "conditions": [
+      {
+        "type": 1,
+        "bit_index": 0,
+        "message": "Vrijgave TrekOpbouw Koppelzone  van"
+      }
+    ],
+    "children": [
+      {
+        "level": 1,
+        "interlock_log_id": 59608,
+        "bsid": "11222",
+        "plc": "TDS",
+        "direction": "UPSTREAM",
+        "timestamp": "2025-03-11 14:14:55",
+        "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+        "status": "",
+        "conditions": [
+          {
+            "type": 1,
+            "bit_index": 7,
+            "message": "Vrijgave TrekOpbouw Koppelzone van Machineposities"
+          }
+        ],
+        "children": [
+          {
+            "level": 2,
+            "interlock_log_id": 92003,
+            "bsid": "10118",
+            "plc": "TDS",
+            "direction": "UPSTREAM",
+            "timestamp": "2025-03-11 14:14:55",
+            "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Machineposities",
+            "status": "*** ROOT CAUSE ***",
+            "conditions": [
+              {
+                "type": 1,
+                "bit_index": 0,
+                "message": "Accu 3 niet voorbij positie leeg"
+              }
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "level": 0,
+    "interlock_log_id": 39611,
+    "bsid": "11221",
+    "plc": "TDS",
+    "direction": "ANCHOR",
+    "timestamp": "2025-03-11 12:50:44",
+    "interlock_message": "VrijgaveTrekOpbouw",
+    "status": "*** STARTING POINT ***",
+    "conditions": [
+      {
+        "type": 1,
+        "bit_index": 1,
+        "message": "Vrijgave TrekOpbouw WT1"
+      }
+    ],
+    "children": [
+      {
+        "level": 1,
+        "interlock_log_id": 95591,
+        "bsid": "11236",
+        "plc": "TDS",
+        "direction": "UPSTREAM",
+        "timestamp": "2025-03-11 12:50:44",
+        "interlock_message": "VrijgaveTrekOpbouw_WT1",
+        "status": "*** ROOT CAUSE ***",
+        "conditions": [
+          {
+            "type": 1,
+            "bit_index": 14,
+            "message": "Vrijgave TrekOpbouw WT1 van Walsverstellingen"
+          }
+        ],
+        "children": []
+      }
+    ]
+  }
+]
