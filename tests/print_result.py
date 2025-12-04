@@ -37,7 +37,7 @@ def save_interlock_results_to_file(interlock_number: int, limit: int = 1, output
 
 
 if __name__ == "__main__":
-    INTERLOCK_NUMBER = 11221
+    INTERLOCK_NUMBER = 10122
     LIMIT = 5
     OUTPUT_FILE = "interlock_results.txt"
 

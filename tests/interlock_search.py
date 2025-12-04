@@ -51,9 +51,9 @@ class InterlockNode:
     conditions: List[InterlockCondition] = field(default_factory=list)
     children: List["InterlockNode"] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> list[dict[str, int | str | None | list[dict[str, Any]]] | list[dict[str, Any]]]:
         """Convert node and its children to dictionary representation."""
-        return {
+        result = {
             "level": self.level,
             "interlock_log_id": self.interlock_log_id,
             "bsid": self.bsid,
@@ -63,8 +63,8 @@ class InterlockNode:
             "interlock_message": self.interlock_message,
             "status": self.status,
             "conditions": [cond.to_dict() for cond in self.conditions],
-            "children": [child.to_dict() for child in self.children]
         }
+        return [result, [child.to_dict() for child in self.children]]
 
     def add_child(self, child: "InterlockNode") -> None:
         """Add a child node to this node."""
@@ -444,7 +444,7 @@ def main(interlock_number: int, limit: int = 1):
 
 if __name__ == "__main__":
     # Configure your analysis parameters here
-    INTERLOCK_NUMBER = 11221
+    INTERLOCK_NUMBER = 1221
     LIMIT = 5
 
     exit(main(INTERLOCK_NUMBER, LIMIT))
