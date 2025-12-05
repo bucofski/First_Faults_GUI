@@ -444,7 +444,7 @@ def main(interlock_number: int, limit: int = 1):
 
 if __name__ == "__main__":
     # Configure your analysis parameters here
-    INTERLOCK_NUMBER = 1221
-    LIMIT = 5
+    INTERLOCK_NUMBER = 11222
+    LIMIT = 1
 
     exit(main(INTERLOCK_NUMBER, LIMIT))

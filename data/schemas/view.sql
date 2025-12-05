@@ -208,19 +208,18 @@ RETURN
 -- Default: Get only the most recent interlock (TOP 1)
 SELECT *
 FROM dbo.fn_InterlockChainByDate(11221, DEFAULT)
-ORDER BY Date DESC, Level DESC, TIMESTAMP;
+ORDER BY Date DESC, TIMESTAMP DESC, level;
 
 -- Explicit: Get only the most recent interlock
 SELECT *
 FROM dbo.fn_InterlockChainByDate(11221, 1)
-ORDER BY Date DESC, Level DESC, TIMESTAMP;
-
+ORDER BY Date DESC, TIMESTAMP DESC, level;
 -- Get the 10 most recent interlocks
 SELECT *
 FROM dbo.fn_InterlockChainByDate(11221, 10)
-ORDER BY Date DESC, Level DESC, TIMESTAMP;
+ORDER BY Date DESC, TIMESTAMP DESC, level;
 
 -- Get the 50 most recent interlocks
 SELECT *
 FROM dbo.fn_InterlockChainByDate(11221, 50)
-ORDER BY Date DESC, Level DESC, TIMESTAMP;
+ORDER BY Date DESC, TIMESTAMP DESC, level;

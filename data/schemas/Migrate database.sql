@@ -163,21 +163,21 @@ BEGIN TRY
     -- ========================================================================
     PRINT 'Step 5: Preparing Interlock Log data (TOP 5000)...';
 
-    SELECT TOP 100000
-        old_il.ID as Old_ID,
-        idef.INTERLOCK_DEF_ID,
-        old_il.TIMESTAMP,
-        old_il.TIMESTAMP_LOG,
-        ISNULL(old_il.ORDER_LOG, 0) as ORDER_LOG
-    INTO #TempInterlockLog
-    FROM TD2.dbo.FF_INTERLOCK_LOG old_il
-    INNER JOIN First_Fault.dbo.PLC p
-        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
-    INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
-        ON p.PLC_ID = idef.PLC_ID
-        AND old_il.NUMBER = idef.NUMBER
-    WHERE old_il.NUMBER IS NOT NULL  -- Only records with valid NUMBER
-    ORDER BY old_il.TIMESTAMP, old_il.ID;
+    SELECT TOP 300000
+            old_il.ID as Old_ID,
+            idef.INTERLOCK_DEF_ID,
+            old_il.TIMESTAMP,
+            old_il.TIMESTAMP_LOG,
+            ISNULL(old_il.ORDER_LOG, 0) as ORDER_LOG
+        INTO #TempInterlockLog
+        FROM TD2.dbo.FF_INTERLOCK_LOG old_il
+        INNER JOIN First_Fault.dbo.PLC p
+            ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
+        INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
+            ON p.PLC_ID = idef.PLC_ID
+            AND old_il.NUMBER = idef.NUMBER
+        WHERE old_il.NUMBER IS NOT NULL  -- Only records with valid NUMBER
+        ORDER BY old_il.TIMESTAMP DESC, old_il.ID DESC;
 
     -- ID mapping with GUID support
     SELECT
