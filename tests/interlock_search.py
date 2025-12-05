@@ -407,21 +407,24 @@ def main(interlock_number: int, limit: int = 1) -> int:
         if not analyzer.test_connection():
             return 1
 
-        # Get dictionary results
-        results = analyzer.analyze_interlock(
-            interlock_number=interlock_number,
-            limit=limit,
-            formatter=DictionaryResultFormatter()
-        )
+        # Fetch data once
+        df = analyzer.repository.get_interlock_chain(interlock_number, limit)
 
+        if df.empty:
+            print(f"⚠️  No data found for interlock {interlock_number}")
+            return 0
+
+        # Build trees once
+        trees = analyzer.tree_builder.build_from_dataframe(df)
+
+        # Format as dictionary
+        dict_formatter = DictionaryResultFormatter()
+        results = dict_formatter.format(trees, interlock_number)
         print(json.dumps(results, indent=2, default=str))
 
-        # Also show console-friendly output
-        console_output = analyzer.analyze_interlock(
-            interlock_number=interlock_number,
-            limit=limit,
-            formatter=ConsoleResultFormatter()
-        )
+        # Format for console (reusing same trees)
+        console_formatter = ConsoleResultFormatter()
+        console_output = console_formatter.format(trees, interlock_number)
         print(console_output)
 
         # Execution time

@@ -48,6 +48,7 @@ def build_database_url(conn_config: dict) -> URL:
             "driver": conn_config["driver"],
             "Encrypt": "yes" if conn_config.get("encrypt", False) else "no",
             "TrustServerCertificate": "yes" if conn_config.get("trust_server_certificate", True) else "no",
+            "MARS_Connection": "yes",
         },
     )
 
