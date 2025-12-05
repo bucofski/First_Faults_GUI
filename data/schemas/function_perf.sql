@@ -1,63 +1,4 @@
 
-CREATE FUNCTION dbo.fn_InterlockChain (@TargetBSID INT)
-RETURNS TABLE
-AS
-RETURN
-(
-    WITH AnchorInterlock AS (
-        -- Get the most recent interlock for the target BSID
-        SELECT TOP 1
-            il.ID as AnchorID,
-            il.TIMESTAMP as AnchorTimestamp
-        FROM First_Fault.dbo.FF_INTERLOCK_LOG il
-        INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
-            ON il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
-        WHERE idef.NUMBER = @TargetBSID
-        ORDER BY il.TIMESTAMP DESC, il.ORDER_LOG DESC
-    ),
-    UpstreamChain AS (
-        -- Anchor: Start with selected interlock
-        SELECT
-            0 as Level,
-            il.ID,
-            il.TIMESTAMP,
-            p.PLC_NAME as PLC,
-            idef.NUMBER as BSID,
-            td_interlock.MESSAGE as Interlock_Message,
-            il.UPSTREAM_INTERLOCK_LOG_ID as UPSTREAM_INTERLOCK_REF,
-            CAST('ANCHOR' AS NVARCHAR(20)) as Direction
-        FROM First_Fault.dbo.FF_INTERLOCK_LOG il
-        INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
-            ON il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
-        INNER JOIN First_Fault.dbo.PLC p
-            ON idef.PLC_ID = p.PLC_ID
-        INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
-            ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
-        CROSS JOIN AnchorInterlock a
-        WHERE il.ID = a.AnchorID
-
-        UNION ALL
-
-        -- Recursive: Follow upstream references
-        SELECT
-            uc.Level + 1,
-            upstream_il.ID,
-            upstream_il.TIMESTAMP,
-            p.PLC_NAME as PLC,
-            idef.NUMBER as BSID,
-            td_interlock.MESSAGE as Interlock_Message,
-            upstream_il.UPSTREAM_INTERLOCK_LOG_ID as UPSTREAM_INTERLOCK_REF,
-            CAST('UPSTREAM' AS NVARCHAR(20)) as Direction
-        FROM UpstreamChain uc
-        INNER JOIN First_Fault.dbo.FF_INTERLOCK_LOG upstream_il
-            ON uc.UPSTREAM_INTERLOCK_REF = upstream_il.ID
-        INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
-            ON upstream_il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
-        INNER JOIN First_Fault.dbo.PLC p
-            ON idef.PLC_ID = p.PLC_ID
-        INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
-            ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
-
 CREATE FUNCTION dbo.fn_InterlockChainByDate (
     @TargetBSID INT,
     @TopN INT = 1  -- Default to 1 if not specified
@@ -123,6 +64,7 @@ RETURN
         INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
             ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
         WHERE uc.UPSTREAM_INTERLOCK_REF IS NOT NULL
+          AND uc.Level < 100
     ),
     DownstreamChain AS (
         -- Start from anchor point
@@ -168,12 +110,15 @@ RETURN
             ON idef.PLC_ID = p.PLC_ID
         INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
             ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
-        WHERE ABS(DATEDIFF(SECOND, dc.TIMESTAMP, downstream_il.TIMESTAMP)) <= 5
+        WHERE downstream_il.TIMESTAMP >= DATEADD(SECOND, -5, dc.TIMESTAMP)
+          AND downstream_il.TIMESTAMP <= DATEADD(SECOND, 5, dc.TIMESTAMP)
+          AND dc.Level > -100
     ),
     CombinedChain AS (
         SELECT * FROM UpstreamChain
-        UNION
+        UNION ALL
         SELECT * FROM DownstreamChain
+        WHERE Direction <> 'ANCHOR'
     )
     SELECT
         cc.Date,
@@ -203,9 +148,10 @@ RETURN
         ON cdef.TEXT_DEF_ID = td_condition.TEXT_DEF_ID
 );
 
+CREATE NONCLUSTERED INDEX IX_FF_INTERLOCK_LOG_UpstreamRef
+ON First_Fault.dbo.FF_INTERLOCK_LOG (UPSTREAM_INTERLOCK_LOG_ID, TIMESTAMP)
+INCLUDE (ID, INTERLOCK_DEF_ID, ORDER_LOG);
 
--- Query the function like a view
--- Default: Get only the most recent interlock (TOP 1)
 SELECT *
 FROM dbo.fn_InterlockChainByDate(11221, DEFAULT)
 ORDER BY Date DESC, TIMESTAMP DESC, level;

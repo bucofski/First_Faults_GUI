@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+
 from interlock_search import InterlockAnalyzer, SQLAlchemyInterlockRepository, DictionaryResultFormatter
 
 
@@ -37,8 +39,11 @@ def save_interlock_results_to_file(interlock_number: int, limit: int = 1, output
 
 
 if __name__ == "__main__":
-    INTERLOCK_NUMBER = 10122
+    start_time = datetime.now()
+    INTERLOCK_NUMBER = 11222
     LIMIT = 5
     OUTPUT_FILE = "interlock_results.txt"
 
     save_interlock_results_to_file(INTERLOCK_NUMBER, LIMIT, OUTPUT_FILE)
+    end_time = datetime.now()
+    print(f"Execution time: {end_time - start_time}")
