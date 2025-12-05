@@ -1,10 +1,10 @@
 
 import os
 from pathlib import Path
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import yaml
-from sqlalchemy import create_engine, URL
+from sqlalchemy import create_engine, URL, Engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker, DeclarativeBase
 
 # ============================================================================
@@ -24,7 +24,7 @@ class Base(DeclarativeBase):
 # ============================================================================
 # Configuration Loader
 # ============================================================================
-def load_db_config(config_path: Optional[Path] = None) -> dict:
+def load_db_config(config_path: Path | None = None) -> dict:
     """Load database configuration from YAML file."""
     path = config_path or CONFIG_PATH
     with open(path, "r") as file:
@@ -56,8 +56,8 @@ def build_database_url(conn_config: dict) -> URL:
 # Session Factory
 # ============================================================================
 def create_db_session(
-    database_url: Optional[URL] = None,
-) -> tuple[scoped_session[Session], Callable]:
+    database_url: URL | None = None,
+) -> tuple[scoped_session[Session], Callable[..., None]]:
     """
     Create a scoped database session and cleanup function.
 
@@ -84,7 +84,7 @@ def create_db_session(
         sessionmaker(autocommit=False, autoflush=False, bind=engine)
     )
 
-    def remove_session(_exc=None):
+    def remove_session(_exc: BaseException | None = None) -> None:
         db_session.remove()
 
     return db_session, remove_session
@@ -93,7 +93,7 @@ def create_db_session(
 # ============================================================================
 # Engine Factory
 # ============================================================================
-def create_db_engine(database_url: Optional[URL] = None, echo: bool = False):
+def create_db_engine(database_url: URL | None = None, echo: bool = False) -> Engine:
     """
     Create a SQLAlchemy engine.
 
@@ -123,7 +123,7 @@ def create_db_engine(database_url: Optional[URL] = None, echo: bool = False):
 # ============================================================================
 # Database Initialization
 # ============================================================================
-def init_db(database_url: Optional[URL] = None):
+def init_db(database_url: URL | None = None) -> None:
     """Initialize database by creating all tables."""
     engine = create_db_engine(database_url, echo=True)
     Base.metadata.drop_all(engine)
@@ -133,10 +133,10 @@ def init_db(database_url: Optional[URL] = None):
 # ============================================================================
 # Global Engine (Lazy Initialization)
 # ============================================================================
-_engine = None
+_engine: Engine | None = None
 
 
-def get_engine():
+def get_engine() -> Engine:
     """Get or create the global engine instance."""
     global _engine
     if _engine is None:

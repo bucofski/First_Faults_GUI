@@ -5,10 +5,10 @@ A modular system for analyzing interlock chains with hierarchical root cause tra
 Follows SOLID principles for maintainability and extensibility.
 """
 
-from typing import Optional, Protocol, List, Dict, Any
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Any
 import json
 
 import pandas as pd
@@ -29,7 +29,7 @@ class InterlockCondition:
     bit_index: int
     message: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type,
             "bit_index": self.bit_index,
@@ -42,14 +42,14 @@ class InterlockNode:
     """Represents a node in the interlock chain hierarchy."""
     level: int
     interlock_log_id: int
-    bsid: Optional[str]
-    plc: Optional[str]
-    direction: Optional[str]
-    timestamp: Optional[str]
-    interlock_message: Optional[str]
-    status: Optional[str]
-    conditions: List[InterlockCondition] = field(default_factory=list)
-    children: List["InterlockNode"] = field(default_factory=list)
+    bsid: str | None
+    plc: str | None
+    direction: str | None
+    timestamp: str | None
+    interlock_message: str | None
+    status: str | None
+    conditions: list[InterlockCondition] = field(default_factory=list)
+    children: list["InterlockNode"] = field(default_factory=list)
 
     def to_dict(self) -> list[dict[str, int | str | None | list[dict[str, Any]]] | list[dict[str, Any]]]:
         """Convert node and its children to dictionary representation."""
@@ -79,7 +79,7 @@ class InterlockTreeBuilder:
     """Service for building hierarchical interlock trees from flat data."""
 
     @staticmethod
-    def build_from_dataframe(df: pd.DataFrame) -> List[InterlockNode]:
+    def build_from_dataframe(df: pd.DataFrame) -> list[InterlockNode]:
         """
         Convert flat DataFrame into nested hierarchical structure.
 
@@ -107,7 +107,7 @@ class InterlockTreeBuilder:
         return trees
 
     @staticmethod
-    def _extract_chains(date_df: pd.DataFrame) -> List[pd.DataFrame]:
+    def _extract_chains(date_df: pd.DataFrame) -> list[pd.DataFrame]:
         """Extract individual chains from a date group."""
         chains = []
         anchor_rows = date_df[date_df["Level"] == 0]
@@ -120,7 +120,7 @@ class InterlockTreeBuilder:
         return chains
 
     @staticmethod
-    def _build_chain_tree(chain_df: pd.DataFrame) -> Optional[InterlockNode]:
+    def _build_chain_tree(chain_df: pd.DataFrame) -> InterlockNode | None:
         """Build a tree from a single chain DataFrame."""
         levels = sorted(chain_df["Level"].unique(), reverse=False)
 
@@ -163,7 +163,7 @@ class InterlockTreeBuilder:
         )
 
     @staticmethod
-    def _extract_conditions(level_data: pd.DataFrame) -> List[InterlockCondition]:
+    def _extract_conditions(level_data: pd.DataFrame) -> list[InterlockCondition]:
         """Extract conditions from level data."""
         conditions = []
         for _, row in level_data.iterrows():
@@ -176,14 +176,14 @@ class InterlockTreeBuilder:
         return conditions
 
     @staticmethod
-    def _clean_plc(plc: Any) -> Optional[str]:
+    def _clean_plc(plc: Any) -> str | None:
         """Clean and format PLC value."""
         if plc is None:
             return None
         return str(plc).strip() or None
 
     @staticmethod
-    def _format_timestamp(timestamp: Any) -> Optional[str]:
+    def _format_timestamp(timestamp: Any) -> str | None:
         """Format timestamp value."""
         if pd.notna(timestamp):
             return str(timestamp)
@@ -269,7 +269,7 @@ class ResultFormatter(ABC):
     """Abstract base class for result formatting."""
 
     @abstractmethod
-    def format(self, trees: List[InterlockNode], interlock_number: int) -> Any:
+    def format(self, trees: list[InterlockNode], interlock_number: int) -> Any:
         """Format results for output."""
         pass
 
@@ -277,7 +277,8 @@ class ResultFormatter(ABC):
 class DictionaryResultFormatter(ResultFormatter):
     """Formats results as hierarchical dictionary/JSON structure."""
 
-    def format(self, trees: List[InterlockNode], interlock_number: int) -> List[Dict[str, Any]]:
+    def format(self, trees: list[InterlockNode], interlock_number: int) -> list[
+        list[dict[str, int | str | None | list[dict[str, Any]]] | list[dict[str, Any]]]]:
         """Convert interlock trees to dictionary representation."""
         return [tree.to_dict() for tree in trees]
 
@@ -285,11 +286,9 @@ class DictionaryResultFormatter(ResultFormatter):
 class ConsoleResultFormatter(ResultFormatter):
     """Formats results for console output."""
 
-    def format(self, trees: List[InterlockNode], interlock_number: int) -> str:
+    def format(self, trees: list[InterlockNode], interlock_number: int) -> str:
         """Format results as readable console output."""
-        output = [f"\n{'=' * 80}"]
-        output.append(f"Root Cause Analysis for Interlock {interlock_number}")
-        output.append(f"{'=' * 80}\n")
+        output = [f"\n{'=' * 80}", f"Root Cause Analysis for Interlock {interlock_number}", f"{'=' * 80}\n"]
 
         if not trees:
             output.append(f"⚠️  No data found for interlock {interlock_number}")
@@ -350,7 +349,7 @@ class InterlockAnalyzer:
         self,
         interlock_number: int,
         limit: int = 1,
-        formatter: Optional[ResultFormatter] = None
+        formatter: ResultFormatter | None = None
     ) -> Any:
         """
         Perform complete interlock analysis.
@@ -384,7 +383,7 @@ class InterlockAnalyzer:
 # CLI Interface
 # ============================================================================
 
-def main(interlock_number: int, limit: int = 1):
+def main(interlock_number: int, limit: int = 1) -> int:
     """
     Command-line interface for interlock analysis.
 
