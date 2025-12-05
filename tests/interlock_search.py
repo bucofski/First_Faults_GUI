@@ -8,6 +8,7 @@ Follows SOLID principles for maintainability and extensibility.
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from datetime import datetime
+from email.policy import default
 from typing import Any
 import json
 
@@ -193,19 +194,46 @@ class InterlockRepository:
         "TYPE", "BIT_INDEX", "Condition_Message"
     )
 
-    def get_interlock_chain(self, interlock_number: int, limit: int = 1) -> pd.DataFrame:
+    def get_interlock_chain(
+        self,
+        target_bsid: int | None = None,
+        top_n: int | None = None,
+        filter_date: datetime | None = None,
+        filter_timestamp_start: datetime | None = None,
+        filter_timestamp_end: datetime | None = None,
+        filter_condition_message: str | None = None,
+        filter_plc: str | None = None
+    ) -> pd.DataFrame:
         """
         Retrieve interlock chain data with upstream/downstream tracing.
+
+        Args:
+            target_bsid: Optional BSID. If NULL, returns last interlocks with their full trees
+            top_n: Number of results to return (default in SQL: 10). If None, uses SQL default
+            filter_date: Optional filter by specific date
+            filter_timestamp_start: Optional filter by timestamp range start
+            filter_timestamp_end: Optional filter by timestamp range end
+            filter_condition_message: Optional search text in condition message
+            filter_plc: Optional filter by PLC name
+
+        Returns:
+            DataFrame with interlock chain data
         """
-        interlock_func = func.dbo.fn_InterlockChainByDate(
-            interlock_number, limit
+        interlock_func = func.dbo.fn_InterlockChain(
+            target_bsid,
+            top_n,
+            filter_date,
+            filter_timestamp_start,
+            filter_timestamp_end,
+            filter_condition_message,
+            filter_plc
         ).table_valued(*self.TVF_COLUMNS)
 
         stmt = (
             select(interlock_func)
             .order_by(
-                interlock_func.c.Date.desc(),
                 interlock_func.c.TIMESTAMP.desc(),
+                interlock_func.c.Date.desc(),
                 interlock_func.c.Level
             )
         )
@@ -327,7 +355,15 @@ class InterlockAnalyzer:
 # CLI Interface
 # ============================================================================
 
-def main(interlock_number: int, limit: int = 1) -> int:
+def main(
+    target_bsid: int | None = None,
+    top_n: int | None = None,
+    filter_date: datetime | None = None,
+    filter_timestamp_start: datetime | None = None,
+    filter_timestamp_end: datetime | None = None,
+    filter_condition_message: str | None = None,
+    filter_plc: str | None = None
+) -> int:
     """Command-line interface for interlock analysis."""
     try:
         analyzer = InterlockAnalyzer()
@@ -340,11 +376,19 @@ def main(interlock_number: int, limit: int = 1) -> int:
         # Start timing after connection is established
         start_time = datetime.now()
 
-        # Fetch data once
-        df = analyzer.repository.get_interlock_chain(interlock_number, limit)
+        # Fetch data
+        df = analyzer.repository.get_interlock_chain(
+            target_bsid=target_bsid,
+            top_n=top_n,
+            filter_date=filter_date,
+            filter_timestamp_start=filter_timestamp_start,
+            filter_timestamp_end=filter_timestamp_end,
+            filter_condition_message=filter_condition_message,
+            filter_plc=filter_plc
+        )
 
         if df.empty:
-            print(f"⚠️  No data found for interlock {interlock_number}")
+            print(f"⚠️  No data found")
             return 0
 
         # Build trees once, format twice
@@ -352,12 +396,12 @@ def main(interlock_number: int, limit: int = 1) -> int:
 
         # Dictionary output
         dict_formatter = DictionaryResultFormatter()
-        results = dict_formatter.format(trees, interlock_number)
+        results = dict_formatter.format(trees, target_bsid)
         print(json.dumps(results, indent=2, default=str))
 
         # Console output (reuses same trees)
         console_formatter = ConsoleResultFormatter()
-        console_output = console_formatter.format(trees, interlock_number)
+        console_output = console_formatter.format(trees, target_bsid)
         print(console_output)
 
         # Execution time
@@ -378,7 +422,13 @@ def main(interlock_number: int, limit: int = 1) -> int:
 
 
 if __name__ == "__main__":
-    INTERLOCK_NUMBER = 31220
-    LIMIT = 10
-
-    exit(main(INTERLOCK_NUMBER, LIMIT))
+    # Example usage with various filters
+    exit(main(
+        target_bsid=None,           # All interlocks
+        top_n=None,                    # Last 10
+        filter_date=None,            # Any date
+        filter_timestamp_start=None, # No start time filter
+        filter_timestamp_end=None,   # No end time filter
+        filter_condition_message=None,  # No message filter
+        filter_plc=None              # Any PLC
+    ))
