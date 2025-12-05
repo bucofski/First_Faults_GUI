@@ -1,21 +1,16 @@
 import json
 from datetime import datetime
 
-from interlock_search import InterlockAnalyzer, SQLAlchemyInterlockRepository, DictionaryResultFormatter
+from interlock_search import InterlockAnalyzer, InterlockRepository, DictionaryResultFormatter
 
 
 def save_interlock_results_to_file(interlock_number: int, limit: int = 1, output_file: str = "interlock_results.txt"):
     """
     Analyze interlock and save hierarchical results to a text file.
-
-    Args:
-        interlock_number: The interlock number to analyze
-        limit: Number of most recent occurrences to retrieve
-        output_file: Path to the output text file
     """
-    # Initialize analyzer
+    # Initialize analyzer (uses InterlockRepository by default)
     analyzer = InterlockAnalyzer(
-        repository=SQLAlchemyInterlockRepository()
+        repository=InterlockRepository()
     )
 
     # Test connection

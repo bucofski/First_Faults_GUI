@@ -13,9 +13,8 @@ import json
 
 import pandas as pd
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
-from DB_Connection import get_engine
+from DB_Connection import get_session
 
 
 # ============================================================================
@@ -82,15 +81,6 @@ class InterlockTreeBuilder:
     def build_from_dataframe(df: pd.DataFrame) -> list[InterlockNode]:
         """
         Convert flat DataFrame into nested hierarchical structure.
-
-        Levels go from highest (root cause) to lowest (downstream effect).
-        Example: Level 2 -> Level 1 -> Level 0
-
-        Args:
-            df: DataFrame with interlock chain data
-
-        Returns:
-            List of root InterlockNode trees
         """
         if df.empty:
             return []
@@ -191,28 +181,11 @@ class InterlockTreeBuilder:
 
 
 # ============================================================================
-# Repository Abstraction
+# Repository
 # ============================================================================
 
-class InterlockRepository(ABC):
-    """Abstract repository for interlock data access."""
-
-    @abstractmethod
-    def get_interlock_chain(self, interlock_number: int, limit: int) -> pd.DataFrame:
-        """Fetch interlock chain data."""
-        pass
-
-    @abstractmethod
-    def test_connection(self) -> bool:
-        """Test database connection."""
-        pass
-
-
-@dataclass
-class SQLAlchemyInterlockRepository(InterlockRepository):
-    """SQLAlchemy-based implementation of InterlockRepository."""
-
-    engine: object = field(default_factory=get_engine)
+class InterlockRepository:
+    """Repository for interlock data access using session context manager."""
 
     TVF_COLUMNS = (
         "Date", "TIMESTAMP", "Level", "Interlock_Log_ID", "BSID",
@@ -223,13 +196,6 @@ class SQLAlchemyInterlockRepository(InterlockRepository):
     def get_interlock_chain(self, interlock_number: int, limit: int = 1) -> pd.DataFrame:
         """
         Retrieve interlock chain data with upstream/downstream tracing.
-
-        Args:
-            interlock_number: Interlock number to search for
-            limit: Number of most recent occurrences to retrieve
-
-        Returns:
-            DataFrame with interlock chain data
         """
         interlock_func = func.dbo.fn_InterlockChainByDate(
             interlock_number, limit
@@ -244,14 +210,14 @@ class SQLAlchemyInterlockRepository(InterlockRepository):
             )
         )
 
-        with Session(self.engine) as session:
+        with get_session() as session:
             result = session.execute(stmt)
             return pd.DataFrame(result.fetchall(), columns=result.keys())
 
     def test_connection(self) -> bool:
         """Test database connection."""
         try:
-            with Session(self.engine) as session:
+            with get_session() as session:
                 result = session.execute(select(func.db_name().label("CurrentDatabase")))
                 row = result.fetchone()
                 print(f"✓ Connection successful! Database: {row.CurrentDatabase}")
@@ -277,8 +243,7 @@ class ResultFormatter(ABC):
 class DictionaryResultFormatter(ResultFormatter):
     """Formats results as hierarchical dictionary/JSON structure."""
 
-    def format(self, trees: list[InterlockNode], interlock_number: int) -> list[
-        list[dict[str, int | str | None | list[dict[str, Any]]] | list[dict[str, Any]]]]:
+    def format(self, trees: list[InterlockNode], interlock_number: int) -> list:
         """Convert interlock trees to dictionary representation."""
         return [tree.to_dict() for tree in trees]
 
@@ -329,16 +294,9 @@ class ConsoleResultFormatter(ResultFormatter):
 
 @dataclass
 class InterlockAnalyzer:
-    """
-    Main analyzer orchestrating the interlock analysis workflow.
+    """Main analyzer orchestrating the interlock analysis workflow."""
 
-    Follows SOLID principles:
-    - Single Responsibility: Orchestrates the analysis process
-    - Open/Closed: Extensible through formatter/repository injection
-    - Dependency Inversion: Depends on abstractions, not implementations
-    """
-
-    repository: InterlockRepository = field(default_factory=SQLAlchemyInterlockRepository)
+    repository: InterlockRepository = field(default_factory=InterlockRepository)
     tree_builder: InterlockTreeBuilder = field(default_factory=InterlockTreeBuilder)
 
     def test_connection(self) -> bool:
@@ -351,31 +309,17 @@ class InterlockAnalyzer:
         limit: int = 1,
         formatter: ResultFormatter | None = None
     ) -> Any:
-        """
-        Perform complete interlock analysis.
-
-        Args:
-            interlock_number: Interlock number to analyze
-            limit: Number of recent occurrences to retrieve
-            formatter: Optional formatter for results (defaults to dictionary)
-
-        Returns:
-            Formatted analysis results
-        """
+        """Perform complete interlock analysis."""
         if formatter is None:
             formatter = DictionaryResultFormatter()
 
-        # Fetch raw data
         df = self.repository.get_interlock_chain(interlock_number, limit)
 
         if df.empty:
             print(f"⚠️  No data found for interlock {interlock_number}")
             return [] if isinstance(formatter, DictionaryResultFormatter) else ""
 
-        # Build hierarchical structure
         trees = self.tree_builder.build_from_dataframe(df)
-
-        # Format and return results
         return formatter.format(trees, interlock_number)
 
 
@@ -384,28 +328,17 @@ class InterlockAnalyzer:
 # ============================================================================
 
 def main(interlock_number: int, limit: int = 1) -> int:
-    """
-    Command-line interface for interlock analysis.
-
-    Args:
-        interlock_number: The interlock number to analyze
-        limit: Number of most recent occurrences to retrieve (default: 1)
-
-    Returns:
-        int: Exit code (0 for success, 1 for error)
-    """
+    """Command-line interface for interlock analysis."""
     try:
-        start_time = datetime.now()
+        analyzer = InterlockAnalyzer()
 
-        # Initialize analyzer
-        analyzer = InterlockAnalyzer(
-            repository=SQLAlchemyInterlockRepository()
-        )
-
-        # Test connection
+        # Test connection (this also warms up the connection pool)
         print("Testing SQL Server connection...")
         if not analyzer.test_connection():
             return 1
+
+        # Start timing after connection is established
+        start_time = datetime.now()
 
         # Fetch data once
         df = analyzer.repository.get_interlock_chain(interlock_number, limit)
@@ -414,22 +347,22 @@ def main(interlock_number: int, limit: int = 1) -> int:
             print(f"⚠️  No data found for interlock {interlock_number}")
             return 0
 
-        # Build trees once
+        # Build trees once, format twice
         trees = analyzer.tree_builder.build_from_dataframe(df)
 
-        # Format as dictionary
+        # Dictionary output
         dict_formatter = DictionaryResultFormatter()
         results = dict_formatter.format(trees, interlock_number)
         print(json.dumps(results, indent=2, default=str))
 
-        # Format for console (reusing same trees)
+        # Console output (reuses same trees)
         console_formatter = ConsoleResultFormatter()
         console_output = console_formatter.format(trees, interlock_number)
         print(console_output)
 
         # Execution time
         elapsed = datetime.now() - start_time
-        print(f"\n✓ Execution time: {elapsed}")
+        print(f"\n✓ Query + processing time: {elapsed}")
 
         return 0
 
@@ -445,7 +378,6 @@ def main(interlock_number: int, limit: int = 1) -> int:
 
 
 if __name__ == "__main__":
-    # Configure your analysis parameters here
     INTERLOCK_NUMBER = 31220
     LIMIT = 10
 
