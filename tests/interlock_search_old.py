@@ -14,7 +14,7 @@ import json
 import pandas as pd
 from sqlalchemy import func, select
 
-from DB_Connection import get_session
+from data.repositories.DB_Connection import get_session
 
 
 # ============================================================================
@@ -319,12 +319,16 @@ class ConsoleResultFormatter(ResultFormatter):
 # Main Analyzer
 # ============================================================================
 
-@dataclass
 class InterlockAnalyzer:
     """Main analyzer orchestrating the interlock analysis workflow."""
 
-    repository: InterlockRepository = field(default_factory=InterlockRepository)
-    tree_builder: InterlockTreeBuilder = field(default_factory=InterlockTreeBuilder)
+    def __init__(
+        self,
+        repository: InterlockRepository | None = None,
+        tree_builder: InterlockTreeBuilder | None = None
+    ):
+        self.repository = repository or InterlockRepository()
+        self.tree_builder = tree_builder or InterlockTreeBuilder()
 
     def test_connection(self) -> bool:
         """Test database connection."""
@@ -423,7 +427,7 @@ def main(
 if __name__ == "__main__":
     # Example usage with various filters
     exit(main(
-        target_bsid=None,           # All interlocks
+        target_bsid=11222,           # All interlocks
         top_n=None,                    # Last 10
         filter_date=None,            # Any date
         filter_timestamp_start=None, # No start time filter

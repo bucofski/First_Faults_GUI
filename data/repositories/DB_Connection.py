@@ -10,8 +10,7 @@ from sqlalchemy.orm import Session, DeclarativeBase
 # Constants
 # ============================================================================
 LOCAL_DIRECTORY = Path(__file__).parent
-CONFIG_PATH = LOCAL_DIRECTORY.parent / "config" / "Connection.yaml"
-
+CONFIG_PATH = LOCAL_DIRECTORY.parent.parent / "config" / "Connection.yaml"
 
 # ============================================================================
 # ORM Base
