@@ -8,7 +8,6 @@ Follows SOLID principles for maintainability and extensibility.
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from datetime import datetime
-from email.policy import default
 from typing import Any
 import json
 
