@@ -18,7 +18,7 @@ RETURN
 (
     WITH AnchorInterlock AS (
         -- Get the anchor interlocks (TOP N based on parameter) with optional filters
-        SELECT TOP (ISNULL(@TopN, 10))
+        SELECT TOP (ISNULL(@TopN, 100))
             il.ID as AnchorID,
             il.TIMESTAMP as AnchorTimestamp,
             CAST(il.TIMESTAMP AS DATE) as AnchorDate
