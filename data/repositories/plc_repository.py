@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import text
 import json
 from business.core.plc_data import PlcMessage
-from data.repositories.db_connection_helper import get_engine
+from data.repositories.DB_Connection import get_engine
 
 
 class PLCRepository:
