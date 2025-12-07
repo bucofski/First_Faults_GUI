@@ -23,21 +23,34 @@ class InterlockAnalyzer:
         return self.repository.test_connection()
 
     def analyze_interlock(
-        self,
-        interlock_number: int,
-        limit: int = 1,
-        formatter: ResultFormatter | None = None
+            self,
+            target_bsid: int | None = None,
+            top_n: int | None = None,
+            filter_date=None,
+            filter_timestamp_start=None,
+            filter_timestamp_end=None,
+            filter_condition_message: str | None = None,
+            filter_plc: str | None = None,
+            formatter: ResultFormatter | None = None
     ) -> list[InterlockNode]:
         """Perform complete interlock analysis."""
         if formatter is None:
             formatter = DictionaryResultFormatter()
 
-        df = self.repository.get_interlock_chain(interlock_number, limit)
+        df = self.repository.get_interlock_chain(
+            target_bsid=target_bsid,
+            top_n=top_n,
+            filter_date=filter_date,
+            filter_timestamp_start=filter_timestamp_start,
+            filter_timestamp_end=filter_timestamp_end,
+            filter_condition_message=filter_condition_message,
+            filter_plc=filter_plc
+        )
 
         if df.empty:
-            print(f"⚠️  No data found for interlock {interlock_number}")
-            return [] if isinstance(formatter, DictionaryResultFormatter) else ""
+            print(f"⚠️  No data found for interlock {target_bsid}")
+            return []
 
         trees = self.tree_builder.build_from_dataframe(df)
-
+        print(trees)
         return trees
