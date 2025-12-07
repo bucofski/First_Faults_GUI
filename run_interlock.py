@@ -1,6 +1,5 @@
 """Runner script for interlock analysis."""
-
-from business.services.cli import main
+from business.utils.cli import main
 
 if __name__ == "__main__":
     exit(main(

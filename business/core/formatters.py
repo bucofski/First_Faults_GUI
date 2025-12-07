@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .models import InterlockNode
+from data.model.models import InterlockNode
 
 
 class ResultFormatter(ABC):

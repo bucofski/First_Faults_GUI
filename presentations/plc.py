@@ -8,9 +8,9 @@ from flask import (
 )
 
 from business.services.diagram_service_view import DiagramService
-from business.services.plc_data_service import PLCDataService
 
-service = PLCDataService()
+
+
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 
 
@@ -21,7 +21,7 @@ def home():
 
 @bp.route("/table")
 def table():
-    return render_template("table.html", title="Table", data=service.get_plc_data())
+    return render_template("table.html", title="Table", data=None)
 
 
 @bp.route("/about")

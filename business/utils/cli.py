@@ -3,8 +3,8 @@
 import json
 from datetime import datetime
 
-from .analyzer import InterlockAnalyzer
-from .formatters import DictionaryResultFormatter, ConsoleResultFormatter
+from business.services.analyzer import InterlockAnalyzer
+from business.core.formatters import DictionaryResultFormatter, ConsoleResultFormatter
 
 
 

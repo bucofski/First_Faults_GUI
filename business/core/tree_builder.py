@@ -2,7 +2,7 @@
 
 from typing import Any
 import pandas as pd
-from .models import InterlockCondition, InterlockNode
+from data.model.models import InterlockCondition, InterlockNode
 
 
 class InterlockTreeBuilder:

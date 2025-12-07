@@ -1,7 +1,9 @@
 import json
 from datetime import datetime
 
-from business.services import InterlockAnalyzer, InterlockRepository, DictionaryResultFormatter
+from business.core.formatters import DictionaryResultFormatter
+from business.services.analyzer import InterlockAnalyzer
+from data.repositories.repository import InterlockRepository
 
 
 def save_interlock_results_to_file(interlock_number: int, limit: int = 1, output_file: str = "interlock_results.txt"):
