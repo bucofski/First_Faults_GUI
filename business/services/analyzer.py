@@ -39,5 +39,5 @@ class InterlockAnalyzer:
             return [] if isinstance(formatter, DictionaryResultFormatter) else ""
 
         trees = self.tree_builder.build_from_dataframe(df)
-        print(trees)
+
         return trees

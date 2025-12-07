@@ -8,6 +8,6 @@ if __name__ == "__main__":
         filter_date=None,               # Any date
         filter_timestamp_start=None,    # No start time filter
         filter_timestamp_end=None,      # No end time filter
-        filter_condition_message=None,  # No message filter
-        filter_plc=None                 # Any PLC
+        filter_condition_message="positioneringen",  # No message filter
+        filter_plc='TDS'                 # Any PLC
     ))
