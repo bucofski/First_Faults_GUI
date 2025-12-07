@@ -4,6 +4,7 @@ from typing import Any
 
 from business.core.formatters import ResultFormatter, DictionaryResultFormatter
 from business.core.tree_builder import InterlockTreeBuilder
+from data.model.models import InterlockNode
 from data.repositories.repository import InterlockRepository
 
 class InterlockAnalyzer:
@@ -26,7 +27,7 @@ class InterlockAnalyzer:
         interlock_number: int,
         limit: int = 1,
         formatter: ResultFormatter | None = None
-    ) -> Any:
+    ) -> list[InterlockNode]:
         """Perform complete interlock analysis."""
         if formatter is None:
             formatter = DictionaryResultFormatter()
@@ -38,4 +39,4 @@ class InterlockAnalyzer:
             return [] if isinstance(formatter, DictionaryResultFormatter) else ""
 
         trees = self.tree_builder.build_from_dataframe(df)
-        return formatter.format(trees, interlock_number)
+        return trees
