@@ -46,10 +46,34 @@ def diagrams():
                            pie_html=pie_html)
 
 
-@bp.route("/table-tree")
+@bp.route("/table-tree", methods=["GET", "POST"])
 def table_tree():
-    items:List[InterlockNode]=service_interlock.analyze_interlock(target_bsid=11222)
-    return render_template("table_tree.html", title="Table", items=items)
+    if request.method == "POST":
+        target_bsid_str = request.form.get("target_bsid", "").strip()
+
+        if target_bsid_str:
+            try:
+                target_bsid = int(target_bsid_str)
+                return redirect(url_for("plc.table_tree", target_bsid=target_bsid))
+            except ValueError:
+                flash("Target BSID must be a valid integer.", "error")
+                return redirect(url_for("plc.table_tree"))
+
+        return redirect(url_for("plc.table_tree"))
+
+    # GET: read target_bsid from query parameter
+    target_bsid = request.args.get("target_bsid", type=int)
+
+    items: List[InterlockNode] = []
+    if target_bsid is not None:
+        items = service_interlock.analyze_interlock(target_bsid=target_bsid)
+
+    flashed = get_flashed_messages(with_categories=True)
+    messages = [m for cat, m in flashed if cat in ("error", "success")]
+
+    return render_template("table_tree.html", title="Interlock Tree", items=items, target_bsid=target_bsid,
+                           messages=messages)
+
 
 
 # New form route
