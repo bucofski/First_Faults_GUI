@@ -6,7 +6,6 @@ from business.core.formatters import ResultFormatter, DictionaryResultFormatter
 from business.core.tree_builder import InterlockTreeBuilder
 from data.repositories.repository import InterlockRepository
 
-
 class InterlockAnalyzer:
     """Main analyzer orchestrating the interlock analysis workflow."""
 
