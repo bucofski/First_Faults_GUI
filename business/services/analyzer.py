@@ -52,5 +52,5 @@ class InterlockAnalyzer:
             return []
 
         trees = self.tree_builder.build_from_dataframe(df)
-        print(trees)
+
         return trees
