@@ -46,35 +46,86 @@ def diagrams():
                            pie_html=pie_html)
 
 
+# ... existing code ...
 @bp.route("/table-tree", methods=["GET", "POST"])
 def table_tree():
     if request.method == "POST":
         target_bsid_str = request.form.get("target_bsid", "").strip()
+        top_n_str = request.form.get("top_n", "").strip()
+        filter_date = request.form.get("filter_date", "").strip() or None
+        filter_timestamp_start = request.form.get("filter_timestamp_start", "").strip() or None
+        filter_timestamp_end = request.form.get("filter_timestamp_end", "").strip() or None
+        filter_condition_message = request.form.get("filter_condition_message", "").strip() or None
+        filter_plc = request.form.get("filter_plc", "").strip() or None
 
+        params = {}
         if target_bsid_str:
             try:
-                target_bsid = int(target_bsid_str)
-                return redirect(url_for("plc.table_tree", target_bsid=target_bsid))
+                params["target_bsid"] = int(target_bsid_str)
             except ValueError:
                 flash("Target BSID must be a valid integer.", "error")
                 return redirect(url_for("plc.table_tree"))
 
-        return redirect(url_for("plc.table_tree"))
+        if top_n_str:
+            try:
+                params["top_n"] = int(top_n_str)
+            except ValueError:
+                pass  # Ignore invalid top_n or handle as needed
 
-    # GET: read target_bsid from query parameter
+        if filter_date:
+            params["filter_date"] = filter_date
+        if filter_timestamp_start:
+            params["filter_timestamp_start"] = filter_timestamp_start
+        if filter_timestamp_end:
+            params["filter_timestamp_end"] = filter_timestamp_end
+        if filter_condition_message:
+            params["filter_condition_message"] = filter_condition_message
+        if filter_plc:
+            params["filter_plc"] = filter_plc
+
+        return redirect(url_for("plc.table_tree", **params))
+
+    # GET: read parameters
     target_bsid = request.args.get("target_bsid", type=int)
+    top_n = request.args.get("top_n", type=int)
+    filter_date = request.args.get("filter_date")
+    filter_timestamp_start = request.args.get("filter_timestamp_start")
+    filter_timestamp_end = request.args.get("filter_timestamp_end")
+    filter_condition_message = request.args.get("filter_condition_message")
+    filter_plc = request.args.get("filter_plc")
 
     items: List[InterlockNode] = []
     if target_bsid is not None:
-        items = service_interlock.analyze_interlock(target_bsid=target_bsid)
+        items = service_interlock.analyze_interlock(
+            target_bsid=target_bsid,
+            top_n=top_n,
+            filter_date=filter_date,
+            filter_timestamp_start=filter_timestamp_start,
+            filter_timestamp_end=filter_timestamp_end,
+            filter_condition_message=filter_condition_message,
+            filter_plc=filter_plc
+        )
 
     flashed = get_flashed_messages(with_categories=True)
     messages = [m for cat, m in flashed if cat in ("error", "success")]
 
-    return render_template("table_tree.html", title="Interlock Tree", items=items, target_bsid=target_bsid,
-                           messages=messages)
+    return render_template(
+        "table_tree.html",
+        title="Interlock Tree",
+        items=items,
+        messages=messages,
+        target_bsid=target_bsid,
+        top_n=top_n,
+        filter_date=filter_date,
+        filter_timestamp_start=filter_timestamp_start,
+        filter_timestamp_end=filter_timestamp_end,
+        filter_condition_message=filter_condition_message,
+        filter_plc=filter_plc
+    )
 
 
+# New form route
+# ... existing code ...
 
 # New form route
 @bp.route("/form", methods=["GET", "POST"])
