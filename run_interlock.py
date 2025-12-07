@@ -3,7 +3,7 @@ from business.utils.cli import main
 
 if __name__ == "__main__":
     exit(main(
-        target_bsid=11222,              # All interlocks
+        target_bsid=None,              # All interlocks
         top_n=None,                     # Last 10
         filter_date=None,               # Any date
         filter_timestamp_start=None,    # No start time filter
