@@ -41,7 +41,13 @@ def main(
             print("⚠️  No data found")
             return 0
 
-        trees = analyzer.tree_builder.build_from_dataframe(df)
+        trees = analyzer.analyze_interlock(target_bsid,
+            top_n,
+            filter_date,
+            filter_timestamp_start,
+            filter_timestamp_end,
+            filter_condition_message,
+            filter_plc)
 
         # Dictionary output
         dict_formatter = DictionaryResultFormatter()
