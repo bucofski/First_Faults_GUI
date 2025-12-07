@@ -1,38 +1,62 @@
+
 <!-- HTML (Jinja) -->
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ title or "Table Tree (1 level)" }}</h1>
+<h1>{{ title or "Interlock Tree" }}</h1>
+
+{% macro render_node(node, parent_id, depth=0) %}
+<tr class="{% if depth == 0 %}parent{% else %}child child-of-{{ parent_id }}{% endif %}"
+    data-node-id="{{ node.interlock_log_id }}-{{ depth }}"
+    {% if depth > 0 %}style="display:none;"{% endif %}>
+    <td style="padding-left: {{ 20 + depth * 30 }}px;">
+        {% if node.children %}
+        <span class="toggle" data-target="{{ node.interlock_log_id }}-{{ depth }}">▶</span>
+        {% else %}
+        <span style="opacity:0.3; margin-right: 6px;">•</span>
+        {% endif %}
+        <strong>Level {{ node.level }}</strong> - {{ node.interlock_message or 'N/A' }}
+    </td>
+    <td>{{ node.bsid or 'N/A' }}</td>
+    <td>{{ node.plc or 'N/A' }}</td>
+    <td>{{ node.direction or 'N/A' }}</td>
+    <td>{{ node.timestamp or 'N/A' }}</td>
+    <td>
+        <span class="status-badge status-{{ (node.status or 'unknown')|lower }}">
+            {{ node.status or 'Unknown' }}
+        </span>
+    </td>
+    <td>
+        {% if node.conditions %}
+        <ul class="conditions-list">
+            {% for cond in node.conditions %}
+            <li>{{ cond.message }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        -
+        {% endif %}
+    </td>
+</tr>
+{% for child in node.children %}
+{{ render_node(child, node.interlock_log_id ~ '-' ~ depth, depth + 1) }}
+{% endfor %}
+{% endmacro %}
 
 <table class="table" id="treegrid">
     <thead>
     <tr>
-        <th>Name</th>
+        <th>Interlock Message</th>
+        <th>BSID</th>
+        <th>PLC</th>
+        <th>Direction</th>
+        <th>Timestamp</th>
         <th>Status</th>
-        <th>Actions</th>
+        <th>Conditions</th>
     </tr>
     </thead>
     <tbody>
     {% for item in items %}
-    <tr class="parent" data-parent-id="{{ item.id }}">
-        <td>
-            {% if item.children %}
-            <span class="toggle" data-target="{{ item.id }}">▶</span>
-            {% else %}
-            <span style="opacity:0.3;">•</span>
-            {% endif %}
-            {{ item.name }}
-        </td>
-        <td>{{ item.status }}</td>
-        <td>superman</td>
-    </tr>
-
-    {% for child in item.children %}
-    <tr class="child child-of-{{ item.id }}" style="display:none;">
-        <td class="indent" style="padding-left:40px;">{{ child.name }}</td>
-        <td>{{ child.status }}</td>
-        <td>{{ child.actions }}</td>
-    </tr>
-    {% endfor %}
+    {{ render_node(item, 'root-' ~ loop.index, 0) }}
     {% endfor %}
     </tbody>
 </table>
@@ -46,6 +70,7 @@
     .table th, .table td {
         border: 1px solid #ddd;
         padding: 8px;
+        vertical-align: top;
     }
 
     .table th {
@@ -57,14 +82,48 @@
         cursor: pointer;
         user-select: none;
         margin-right: 6px;
-    }
-
-    .indent {
-        padding-left: 100px;
+        font-size: 10px;
     }
 
     tr.child {
         background: #fafafa;
+    }
+
+    tr.child td:first-child {
+        border-left: 3px solid #007bff;
+    }
+
+    .conditions-list {
+        margin: 0;
+        padding-left: 16px;
+        font-size: 0.85em;
+    }
+
+    .conditions-list li {
+        margin-bottom: 2px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .status-badge.status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .status-badge.status-unknown {
+        background: #e2e3e5;
+        color: #383d41;
     }
 </style>
 
@@ -73,9 +132,19 @@
         const t = e.target.closest(".toggle");
         if (!t) return;
         const id = t.getAttribute("data-target");
-        const rows = document.querySelectorAll(".child-of-" + id);
+        const rows = document.querySelectorAll(".child-of-" + CSS.escape(id));
         const isOpen = t.textContent.trim() === "▼";
-        rows.forEach(r => r.style.display = isOpen ? "none" : "");
+
+        rows.forEach(r => {
+            r.style.display = isOpen ? "none" : "";
+            // Collapse nested children when parent is collapsed
+            if (isOpen) {
+                const nestedToggle = r.querySelector(".toggle");
+                if (nestedToggle && nestedToggle.textContent.trim() === "▼") {
+                    nestedToggle.click();
+                }
+            }
+        });
         t.textContent = isOpen ? "▶" : "▼";
     });
 </script>

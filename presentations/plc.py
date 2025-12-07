@@ -1,3 +1,5 @@
+from typing import List
+
 from flask import (
     Blueprint,
     flash,
@@ -7,12 +9,12 @@ from flask import (
     url_for, get_flashed_messages,
 )
 
+from business.services.analyzer import InterlockAnalyzer
 from business.services.diagram_service_view import DiagramService
-
-
+from data.model.models import InterlockNode
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
-
+service_interlock = InterlockAnalyzer()
 
 @bp.route("/")
 def home():
@@ -46,53 +48,7 @@ def diagrams():
 
 @bp.route("/table-tree")
 def table_tree():
-    items = [
-        {
-            "id": 1,
-            "name": "Parent A",
-            "status": "OK",
-            "children": [
-                {"id": 11, "name": "Child A1", "status": "OK"},
-                {"id": 13, "name": "Child A2", "status": "Warn"},
-                {"id": 14, "name": "Child A2", "status": "Warn"},
-                {"id": 15, "name": "Child A2", "status": "Warn"},
-                {"id": 16, "name": "Child A2", "status": "Warn"},
-            ],
-        },
-        {
-            "id": 2,
-            "name": "Parent B",
-            "status": "Fail",
-            "children": [
-                {"id": 21, "name": "Child B1", "status": "OK"},
-                {"id": 22, "name": "Child B2", "status": "Warn"},
-                {"id": 23, "name": "Child B3", "status": "Fail"},
-                {"id": 24, "name": "Child B4", "status": "OK"},
-                {"id": 25, "name": "Child B5", "status": "Warn"},
-                {"id": 26, "name": "Child B6", "status": "Fail"},
-                {"id": 27, "name": "Child B7", "status": "OK"},
-                {"id": 28, "name": "Child B8", "status": "Warn"},
-                {"id": 29, "name": "Child B9", "status": "Fail"},
-                {"id": 30, "name": "Child B10", "status": "OK"},
-                {"id": 31, "name": "Child B11", "status": "Warn"},
-                {"id": 32, "name": "Child B12", "status": "Fail"},
-                {"id": 33, "name": "Child B13", "status": "OK"},
-                {"id": 34, "name": "Child B14", "status": "Warn"},
-                {"id": 35, "name": "Child B15", "status": "Fail"},
-                {"id": 36, "name": "Child B16", "status": "OK"},
-                {"id": 37, "name": "Child B17", "status": "Warn"},
-                {"id": 38, "name": "Child B18", "status": "Fail"},
-                {"id": 39, "name": "Child B19", "status": "OK"},
-                {"id": 40, "name": "Child B20", "status": "Warn"},
-            ],
-        },
-        {
-            "id": 3,
-            "name": "Parent C",
-            "status": "OK",
-            "children": [],
-        },
-    ]
+    items:List[InterlockNode]=service_interlock.analyze_interlock(target_bsid=11222)
     return render_template("table_tree.html", title="Table", items=items)
 
 
