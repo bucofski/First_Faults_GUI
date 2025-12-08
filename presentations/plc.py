@@ -63,14 +63,14 @@ def table_tree():
             try:
                 params["target_bsid"] = int(target_bsid_str)
             except ValueError:
-                flash("Target BSID must be a valid integer.", "error")
-                return redirect(url_for("plc.table_tree"))
+               flash("Target BSID must be a valid integer.", "error")
+              #  return redirect(url_for("plc.table_tree"))
 
         if top_n_str:
             try:
                 params["top_n"] = int(top_n_str)
             except ValueError:
-                pass  # Ignore invalid top_n or handle as needed
+                flash("Top must be a valid integer.", "error")
 
         if filter_date:
             params["filter_date"] = filter_date
@@ -94,8 +94,9 @@ def table_tree():
     filter_condition_message = request.args.get("filter_condition_message")
     filter_plc = request.args.get("filter_plc")
 
-    items: List[InterlockNode] = []
-    if target_bsid is not None:
+    if target_bsid is None and top_n is None and filter_date is None and filter_timestamp_start is None and filter_timestamp_end is None and filter_condition_message is None and filter_plc is None:
+        items= []
+    else:
         items = service_interlock.analyze_interlock(
             target_bsid=target_bsid,
             top_n=top_n,
@@ -124,10 +125,6 @@ def table_tree():
     )
 
 
-# New form route
-# ... existing code ...
-
-# New form route
 @bp.route("/form", methods=["GET", "POST"])
 def form():
     if request.method == "POST":
