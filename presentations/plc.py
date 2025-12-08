@@ -1,3 +1,5 @@
+from typing import List
+
 from flask import (
     Blueprint,
     flash,
@@ -7,12 +9,12 @@ from flask import (
     url_for, get_flashed_messages,
 )
 
+from business.services.analyzer import InterlockAnalyzer
 from business.services.diagram_service_view import DiagramService
-
-
+from data.model.models import InterlockNode
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
-
+service_interlock = InterlockAnalyzer()
 
 @bp.route("/")
 def home():
@@ -44,57 +46,86 @@ def diagrams():
                            pie_html=pie_html)
 
 
-@bp.route("/table-tree")
+# ... existing code ...
+@bp.route("/table-tree", methods=["GET", "POST"])
 def table_tree():
-    items = [
-        {
-            "id": 1,
-            "name": "Parent A",
-            "status": "OK",
-            "children": [
-                {"id": 11, "name": "Child A1", "status": "OK"},
-                {"id": 13, "name": "Child A2", "status": "Warn"},
-                {"id": 14, "name": "Child A2", "status": "Warn"},
-                {"id": 15, "name": "Child A2", "status": "Warn"},
-                {"id": 16, "name": "Child A2", "status": "Warn"},
-            ],
-        },
-        {
-            "id": 2,
-            "name": "Parent B",
-            "status": "Fail",
-            "children": [
-                {"id": 21, "name": "Child B1", "status": "OK"},
-                {"id": 22, "name": "Child B2", "status": "Warn"},
-                {"id": 23, "name": "Child B3", "status": "Fail"},
-                {"id": 24, "name": "Child B4", "status": "OK"},
-                {"id": 25, "name": "Child B5", "status": "Warn"},
-                {"id": 26, "name": "Child B6", "status": "Fail"},
-                {"id": 27, "name": "Child B7", "status": "OK"},
-                {"id": 28, "name": "Child B8", "status": "Warn"},
-                {"id": 29, "name": "Child B9", "status": "Fail"},
-                {"id": 30, "name": "Child B10", "status": "OK"},
-                {"id": 31, "name": "Child B11", "status": "Warn"},
-                {"id": 32, "name": "Child B12", "status": "Fail"},
-                {"id": 33, "name": "Child B13", "status": "OK"},
-                {"id": 34, "name": "Child B14", "status": "Warn"},
-                {"id": 35, "name": "Child B15", "status": "Fail"},
-                {"id": 36, "name": "Child B16", "status": "OK"},
-                {"id": 37, "name": "Child B17", "status": "Warn"},
-                {"id": 38, "name": "Child B18", "status": "Fail"},
-                {"id": 39, "name": "Child B19", "status": "OK"},
-                {"id": 40, "name": "Child B20", "status": "Warn"},
-            ],
-        },
-        {
-            "id": 3,
-            "name": "Parent C",
-            "status": "OK",
-            "children": [],
-        },
-    ]
-    return render_template("table_tree.html", title="Table", items=items)
+    if request.method == "POST":
+        target_bsid_str = request.form.get("target_bsid", "").strip()
+        top_n_str = request.form.get("top_n", "").strip()
+        filter_date = request.form.get("filter_date", "").strip() or None
+        filter_timestamp_start = request.form.get("filter_timestamp_start", "").strip() or None
+        filter_timestamp_end = request.form.get("filter_timestamp_end", "").strip() or None
+        filter_condition_message = request.form.get("filter_condition_message", "").strip() or None
+        filter_plc = request.form.get("filter_plc", "").strip() or None
 
+        params = {}
+        if target_bsid_str:
+            try:
+                params["target_bsid"] = int(target_bsid_str)
+            except ValueError:
+                flash("Target BSID must be a valid integer.", "error")
+                return redirect(url_for("plc.table_tree"))
+
+        if top_n_str:
+            try:
+                params["top_n"] = int(top_n_str)
+            except ValueError:
+                pass  # Ignore invalid top_n or handle as needed
+
+        if filter_date:
+            params["filter_date"] = filter_date
+        if filter_timestamp_start:
+            params["filter_timestamp_start"] = filter_timestamp_start
+        if filter_timestamp_end:
+            params["filter_timestamp_end"] = filter_timestamp_end
+        if filter_condition_message:
+            params["filter_condition_message"] = filter_condition_message
+        if filter_plc:
+            params["filter_plc"] = filter_plc
+
+        return redirect(url_for("plc.table_tree", **params))
+
+    # GET: read parameters
+    target_bsid = request.args.get("target_bsid", type=int)
+    top_n = request.args.get("top_n", type=int)
+    filter_date = request.args.get("filter_date")
+    filter_timestamp_start = request.args.get("filter_timestamp_start")
+    filter_timestamp_end = request.args.get("filter_timestamp_end")
+    filter_condition_message = request.args.get("filter_condition_message")
+    filter_plc = request.args.get("filter_plc")
+
+    items: List[InterlockNode] = []
+    if target_bsid is not None:
+        items = service_interlock.analyze_interlock(
+            target_bsid=target_bsid,
+            top_n=top_n,
+            filter_date=filter_date,
+            filter_timestamp_start=filter_timestamp_start,
+            filter_timestamp_end=filter_timestamp_end,
+            filter_condition_message=filter_condition_message,
+            filter_plc=filter_plc
+        )
+
+    flashed = get_flashed_messages(with_categories=True)
+    messages = [m for cat, m in flashed if cat in ("error", "success")]
+
+    return render_template(
+        "table_tree.html",
+        title="Interlock Tree",
+        items=items,
+        messages=messages,
+        target_bsid=target_bsid,
+        top_n=top_n,
+        filter_date=filter_date,
+        filter_timestamp_start=filter_timestamp_start,
+        filter_timestamp_end=filter_timestamp_end,
+        filter_condition_message=filter_condition_message,
+        filter_plc=filter_plc
+    )
+
+
+# New form route
+# ... existing code ...
 
 # New form route
 @bp.route("/form", methods=["GET", "POST"])

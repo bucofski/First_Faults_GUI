@@ -1,43 +1,288 @@
-<!-- HTML (Jinja) -->
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ title or "Table Tree (1 level)" }}</h1>
+<h1>{{ title or "Interlock Tree" }}</h1>
+
+{% for message in messages %}
+<div class="alert alert-error">{{ message }}</div>
+{% endfor %}
+
+<form method="POST" action="{{ url_for('plc.table_tree') }}" class="bsid-form" id="bsid-form">
+    <div class="form-row">
+        <div class="form-group">
+            <label for="target_bsid">Target BSID:</label>
+            <input type="number"
+                   id="target_bsid"
+                   name="target_bsid"
+                   value="{{ target_bsid or '' }}"
+                   placeholder="Enter BSID"
+                   class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="top_n">Top N:</label>
+            <input type="number"
+                   id="top_n"
+                   name="top_n"
+                   value="{{ top_n or '' }}"
+                   placeholder="Limit"
+                   class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="filter_plc">PLC Filter:</label>
+            <input type="text"
+                   id="filter_plc"
+                   name="filter_plc"
+                   value="{{ filter_plc or '' }}"
+                   placeholder="PLC Name"
+                   class="form-control">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="filter_date">Date:</label>
+            <input type="date"
+                   id="filter_date"
+                   name="filter_date"
+                   value="{{ filter_date or '' }}"
+                   class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="filter_timestamp_start">Start Time:</label>
+            <input type="datetime-local"
+                   id="filter_timestamp_start"
+                   name="filter_timestamp_start"
+                   value="{{ filter_timestamp_start or '' }}"
+                   class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="filter_timestamp_end">End Time:</label>
+            <input type="datetime-local"
+                   id="filter_timestamp_end"
+                   name="filter_timestamp_end"
+                   value="{{ filter_timestamp_end or '' }}"
+                   class="form-control">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group full-width">
+            <label for="filter_condition_message">Condition Message:</label>
+            <input type="text"
+                   id="filter_condition_message"
+                   name="filter_condition_message"
+                   value="{{ filter_condition_message or '' }}"
+                   placeholder="Filter message..."
+                   class="form-control"
+                   list="message_options">
+            <datalist id="message_options">
+                <!-- Options could be dynamically populated -->
+            </datalist>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <button type="submit" class="btn btn-primary" id="submit-btn">Load</button>
+    </div>
+</form>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p>Loading data...</p>
+    </div>
+</div>
+
+{% if target_bsid %}
+<p><strong>Showing results for BSID:</strong> {{ target_bsid }}</p>
+{% endif %}
+
+{% if items %}
+{% macro render_node(node, parent_id, depth=0) %}
+<tr class="{% if depth == 0 %}parent{% else %}child child-of-{{ parent_id }}{% endif %}"
+    data-node-id="{{ node.interlock_log_id }}-{{ depth }}"
+    {% if depth > 0 %}style="display:none;"{% endif %}>
+    <td style="padding-left: {{ 20 + depth * 30 }}px;">
+        {% if node.children %}
+        <span class="toggle" data-target="{{ node.interlock_log_id }}-{{ depth }}">▶</span>
+        {% else %}
+        <span style="opacity:0.3; margin-right: 6px;">•</span>
+        {% endif %}
+        <strong>Level {{ node.level }}</strong> - {{ node.interlock_message or 'N/A' }}
+    </td>
+    <td>{{ node.bsid or 'N/A' }}</td>
+    <td>{{ node.plc or 'N/A' }}</td>
+    <td>{{ node.direction or 'N/A' }}</td>
+    <td>{{ node.timestamp or 'N/A' }}</td>
+    <td>
+        <span class="status-badge status-{{ (node.status or 'unknown')|lower }}">
+            {{ node.status or 'Unknown' }}
+        </span>
+    </td>
+    <td>
+        {% if node.conditions %}
+        <ul class="conditions-list">
+            {% for cond in node.conditions %}
+            <li>{{ cond.message }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        -
+        {% endif %}
+    </td>
+</tr>
+{% for child in node.children %}
+{{ render_node(child, node.interlock_log_id ~ '-' ~ depth, depth + 1) }}
+{% endfor %}
+{% endmacro %}
 
 <table class="table" id="treegrid">
     <thead>
     <tr>
-        <th>Name</th>
+        <th>Interlock Message</th>
+        <th>BSID</th>
+        <th>PLC</th>
+        <th>Direction</th>
+        <th>Timestamp</th>
         <th>Status</th>
-        <th>Actions</th>
+        <th>Conditions</th>
     </tr>
     </thead>
     <tbody>
     {% for item in items %}
-    <tr class="parent" data-parent-id="{{ item.id }}">
-        <td>
-            {% if item.children %}
-            <span class="toggle" data-target="{{ item.id }}">▶</span>
-            {% else %}
-            <span style="opacity:0.3;">•</span>
-            {% endif %}
-            {{ item.name }}
-        </td>
-        <td>{{ item.status }}</td>
-        <td>superman</td>
-    </tr>
-
-    {% for child in item.children %}
-    <tr class="child child-of-{{ item.id }}" style="display:none;">
-        <td class="indent" style="padding-left:40px;">{{ child.name }}</td>
-        <td>{{ child.status }}</td>
-        <td>{{ child.actions }}</td>
-    </tr>
-    {% endfor %}
+    {{ render_node(item, 'root-' ~ loop.index, 0) }}
     {% endfor %}
     </tbody>
 </table>
+{% elif target_bsid %}
+<p class="no-results">No interlock data found for BSID {{ target_bsid }}.</p>
+{% else %}
+<p class="no-results">Enter a Target BSID to load interlock data.</p>
+{% endif %}
 
 <style>
+    .bsid-form {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f9f9f9;
+        border-radius: 4px;
+    }
+
+    .bsid-form .form-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+
+    .bsid-form .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .bsid-form .form-group.full-width {
+        width: 100%;
+        flex: 1 1 100%;
+    }
+
+    .bsid-form label {
+        font-weight: 500;
+        font-size: 0.9em;
+    }
+
+    .bsid-form input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        min-width: 150px;
+    }
+
+    .bsid-form .form-control {
+        width: 100%; /* Ensure input takes container width */
+        box-sizing: border-box;
+    }
+
+    .bsid-form button {
+        padding: 8px 16px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        align-self: flex-start;
+    }
+
+    .bsid-form button:hover {
+        background: #0056b3;
+    }
+
+    .bsid-form button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+
+    /* Loading Overlay Styles */
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .loading-overlay.active {
+        display: flex;
+    }
+
+    .loading-content {
+        background: white;
+        padding: 40px 60px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .loading-spinner {
+        width: 80px;
+        height: 80px;
+        border: 8px solid #e0e0e0;
+        border-top: 8px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px auto;
+    }
+
+    .loading-content p {
+        margin: 0;
+        font-size: 18px;
+        color: #333;
+        font-weight: 500;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .alert-error {
+        padding: 10px;
+        background: #f8d7da;
+        color: #721c24;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+
+    .no-results {
+        color: #666;
+        font-style: italic;
+    }
+
     .table {
         width: 100%;
         border-collapse: collapse;
@@ -46,6 +291,7 @@
     .table th, .table td {
         border: 1px solid #ddd;
         padding: 8px;
+        vertical-align: top;
     }
 
     .table th {
@@ -57,25 +303,78 @@
         cursor: pointer;
         user-select: none;
         margin-right: 6px;
-    }
-
-    .indent {
-        padding-left: 100px;
+        font-size: 10px;
     }
 
     tr.child {
         background: #fafafa;
     }
+
+    tr.child td:first-child {
+        border-left: 3px solid #007bff;
+    }
+
+    .conditions-list {
+        margin: 0;
+        padding-left: 16px;
+        font-size: 0.85em;
+    }
+
+    .conditions-list li {
+        margin-bottom: 2px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .status-badge.status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .status-badge.status-unknown {
+        background: #e2e3e5;
+        color: #383d41;
+    }
 </style>
 
 <script>
+    // Form loading state - show overlay
+    document.getElementById("bsid-form").addEventListener("submit", function() {
+        const overlay = document.getElementById("loading-overlay");
+        const btn = document.getElementById("submit-btn");
+
+        overlay.classList.add("active");
+        btn.disabled = true;
+    });
+
     document.addEventListener("click", function (e) {
         const t = e.target.closest(".toggle");
         if (!t) return;
         const id = t.getAttribute("data-target");
-        const rows = document.querySelectorAll(".child-of-" + id);
+        const rows = document.querySelectorAll(".child-of-" + CSS.escape(id));
         const isOpen = t.textContent.trim() === "▼";
-        rows.forEach(r => r.style.display = isOpen ? "none" : "");
+
+        rows.forEach(r => {
+            r.style.display = isOpen ? "none" : "";
+            // Collapse nested children when parent is collapsed
+            if (isOpen) {
+                const nestedToggle = r.querySelector(".toggle");
+                if (nestedToggle && nestedToggle.textContent.trim() === "▼") {
+                    nestedToggle.click();
+                }
+            }
+        });
         t.textContent = isOpen ? "▶" : "▼";
     });
 </script>
