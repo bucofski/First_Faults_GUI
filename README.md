@@ -2,6 +2,10 @@
 
 ## project description
 
-A gui for cimplicity users to see historic first fault. Also reporting and analysing
+A gui for simplicity users to see historic first fault. Also reporting and analysing
 
 flask --app app run --debug
+
+## Structure
+
+![img.png](requirements/img.png)
