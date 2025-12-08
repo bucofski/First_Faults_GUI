@@ -51,7 +51,7 @@ SQL Server → Query-service → Analyse → UI (filters, grafieken) → Rapport
 
 - **Week 1-5:** analyse + DB-connectie & basisqueries + first ui (Tom,benoit)
 - **Week 5-8:** Agile iteratie op andere usecases 
-- **Week 9-14:** apportage & integratie
+- **Week 9-14:** rapportage & integratie
 
 
 
