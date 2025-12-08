@@ -65,7 +65,7 @@
     </div>
 
     <div class="form-row">
-        <div class="form-group full-width">
+        <div class="form-group">
             <label for="filter_condition_message">Condition Message:</label>
             <input type="text"
                    id="filter_condition_message"
@@ -73,10 +73,8 @@
                    value="{{ filter_condition_message or '' }}"
                    placeholder="Filter message..."
                    class="form-control"
-                   list="message_options">
-            <datalist id="message_options">
-                <!-- Options could be dynamically populated -->
-            </datalist>
+                  >
+
         </div>
     </div>
 
@@ -349,7 +347,6 @@
 </style>
 
 <script>
-    // Form loading state - show overlay
     document.getElementById("bsid-form").addEventListener("submit", function() {
         const overlay = document.getElementById("loading-overlay");
         const btn = document.getElementById("submit-btn");
