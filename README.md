@@ -2,9 +2,8 @@
 
 ## 1. Team
 
-- **Benoit** – Frontend (UI & visualisaties)
-- **Tom** – Backend (API, databaseconnectie)
-- **Bertje** – Data-analyse (queries, rapportage)
+- **Benoit** – Frontend (UI & visualisaties, API)
+- **Tom** – Backend (databaseconnectie,queries, rapportage))
 
 **Deadline:** 11 juni (MVP), tussentijdse vooruitgang: 26 februari  
 **Rapportage:** Maandelijks
@@ -26,7 +25,7 @@ Ontwikkeling van een Python-gebaseerde webapplicatie die historische alarmen uit
 Regeltechniekers, lijnverantwoordelijken, productiebedienden bij Arcelor die CIMPLICITY gebruiken of personeel die het onderhoud op de site doet om vroegtijdige problemen op te sporen.
 
 ### Uniek punt:
-- Vrije query's op historische alarmdata
+- Vrije query's op historische alarmdata (in progress)
 - Trendanalyse (stijgingen per PLC)
 - Automatische PDF-rapporten
 - Gebruiksvriendelijke UI binnen IIS met user-identificatie
