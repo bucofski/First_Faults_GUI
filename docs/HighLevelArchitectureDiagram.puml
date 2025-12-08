@@ -1,0 +1,50 @@
+@startuml High-level Architecture
+
+skinparam componentStyle uml2
+skinparam backgroundColor white
+skinparam handwritten false
+
+title First_Faults_GUI - High-level Architectuur
+
+actor "Gebruiker" as user
+
+package "Presentation Layer" <<Frame>> #LightBlue {
+    [Flask Web App] as flask
+    [Templates (Jinja2)] as templates
+    [Static Assets] as static
+}
+
+package "Business Layer" <<Frame>> #LightGreen {
+    [InterlockAnalyzer] as analyzer
+    [InterlockTreeBuilder] as tree
+    [Formatters] as formatters
+    [Diagram Service] as diagram
+}
+
+package "Data Layer" <<Frame>> #LightYellow {
+    [InterlockRepository] as repo
+    [DB Connection] as dbconn
+    [Domain Models] as models
+}
+
+database "Database" as db #LightGray
+
+' Connections
+user --> flask : HTTP Request
+flask --> templates : renders
+flask --> static : serves
+flask --> analyzer : uses
+
+analyzer --> tree : builds trees
+analyzer --> formatters : formats output
+analyzer --> repo : fetches data
+analyzer --> models : creates
+
+tree --> models : creates InterlockNode
+diagram --> models : visualizes
+
+repo --> dbconn : connection
+repo --> models : maps to
+dbconn --> db : SQL Queries
+
+@enduml

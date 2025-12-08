@@ -40,12 +40,7 @@ Regeltechniekers, lijnverantwoordelijken, productiebedienden bij Arcelor die CIM
 - **Niet gebruiken:** Shiny (R-based, niet Python)
 
 ## 5. High-level Architectuur
-
-### Minstens 2 Python-modules:
-- `db_access.py` – SQL Server connectie & query's
-- `analysis.py` – Trendberekening & top-10 alarmen
-- `ui_app.py` – Webinterface (Flask/Django)
-- `reporting.py` – PDF-generatie
+![img_1.png](docs/img_1.png)
 
 ### Flow:
 ```
@@ -54,10 +49,12 @@ SQL Server → Query-service → Analyse → UI (filters, grafieken) → Rapport
 
 ## 6. Planning
 
-- **Week 1-4:** DB-connectie & basisqueries (Tom)
-- **Week 5-8:** Analyse & trendlogica (Bertje)
-- **Week 9-12:** UI & grafieken (Benoit)
-- **Week 13-14:** Rapportage & integratie
+- **Week 1-5:** analyse + DB-connectie & basisqueries + first ui (Tom,benoit)
+- **Week 5-8:** Agile iteratie op andere usecases 
+- **Week 9-14:** apportage & integratie
+
+
+
 
 **Vooruitgangsmoment:** 26 feb → werkende query + eerste grafiek  
 **MVP:** 11 juni → volledige flow + rapportage
@@ -74,5 +71,4 @@ SQL Server → Query-service → Analyse → UI (filters, grafieken) → Rapport
 flask --app app run --debug
 
 ## Structure
-
 ![img.png](docs/img.png)
