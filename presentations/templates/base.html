@@ -18,7 +18,7 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('plc.home') }}">First_Faults_GUI</a>
+        <a class="navbar-brand" href="{{ url_for('plc.home') }}">First Faults GUI</a>
         <button aria-controls="topnav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler"
                 data-bs-target="#topnav" data-bs-toggle="collapse" type="button">
 
@@ -28,18 +28,17 @@
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item"><a class="nav-link {% if title=='Home' %}active{% endif %}"
                                         href="{{ url_for('plc.home') }}">Home</a></li>
+
+                <li class="nav-item"><a class="nav-link {% if title=='Diagrams' %}active{% endif %}"
+                                        href="{{ url_for('plc.diagrams') }}">Diagrams</a></li>
+
+                <li class="nav-item"><a class="nav-link {% if title=='Table Tree' %}active{% endif %}"
+                                        href="{{ url_for('plc.table_tree') }}">Tables</a></li>
                 <li class="nav-item"><a class="nav-link {% if title=='About' %}active{% endif %}"
                                         href="{{ url_for('plc.about') }}">About</a></li>
                 <li class="nav-item"><a class="nav-link {% if title=='Contact' %}active{% endif %}"
                                         href="{{ url_for('plc.contact') }}">Contact</a></li>
-                <li class="nav-item"><a class="nav-link {% if title=='Form' %}active{% endif %}"
-                                        href="{{ url_for('plc.form') }}">Form</a></li>
-                <li class="nav-item"><a class="nav-link {% if title=='Diagrams' %}active{% endif %}"
-                                        href="{{ url_for('plc.diagrams') }}">Diagrams</a></li>
-                <li class="nav-item"><a class="nav-link {% if title=='Table' %}active{% endif %}"
-                                        href="{{ url_for('plc.table') }}">Tables</a></li>
-                <li class="nav-item"><a class="nav-link {% if title=='Table Tree' %}active{% endif %}"
-                                        href="{{ url_for('plc.table_tree') }}">Tables</a></li>
+
             </ul>
             <span class="navbar-text ms-auto">
             user : {{ session.username or 'Guest' }} &nbsp; Role : {{ session.role or 'GUEST' }}

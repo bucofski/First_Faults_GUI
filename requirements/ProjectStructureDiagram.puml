@@ -1,0 +1,131 @@
+@startuml First_Faults_GUI Project Structure
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+title First_Faults_GUI - Project Structure
+
+package "First_Faults_GUI" {
+    
+    package "business" <<Layer>> {
+        package "core" {
+            [singleton.py]
+            [formatters.py]
+            [tree_builder.py]
+        }
+        
+        package "services" {
+            [analyzer.py] as bsa
+            [diagram_service_view.py]
+        }
+        
+        package "utils" {
+            [cli.py]
+            [print_result.py]
+        }
+    }
+    
+    package "data" <<Layer>> {
+        package "model" {
+            [models.py]
+        }
+        
+        package "repositories" {
+            [repository.py]
+            [DB_Connection.py]
+        }
+        
+        package "schemas" {
+            [prod_sql.sql]
+            [Create database.sql]
+            [Migrate database.sql]
+            folder "SQL Tests" {
+            }
+        }
+    }
+    
+    package "presentations" <<Layer>> {
+        [app.py]
+        [plc.py]
+        
+        package "routes" {
+        }
+        
+        package "services" as ps {
+            [creadential.py]
+            [credential_service.py]
+        }
+        
+        package "validators" {
+        }
+        
+        package "static" {
+            folder "images" {
+            }
+            [style.css]
+        }
+        
+        package "templates" {
+            [base.html]
+            [home.html]
+            [about.html]
+            [contact.html]
+            [diagrams.html]
+            [form.html]
+            [table.html]
+            [table_tree.html]
+        }
+    }
+    
+    package "config" {
+        [config.toml]
+    }
+    
+    package "requirements" {
+        [file.txt]
+    }
+    
+    package "tests" {
+    }
+    
+    package "scripts" {
+    }
+    
+    [run_interlock.py] as entry
+    [pyproject.toml]
+    [README.md]
+}
+
+' Dependencies
+entry --> bsa
+bsa --> [tree_builder.py]
+bsa --> [formatters.py]
+bsa --> [repository.py]
+bsa --> [models.py]
+[tree_builder.py] --> [models.py]
+[repository.py] --> [DB_Connection.py]
+[app.py] --> bsa
+[diagram_service_view.py] --> [models.py]
+
+note right of "business"
+  Business Logic Layer
+  - Core algorithms
+  - Services orchestration
+  - Utilities
+end note
+
+note right of "data"
+  Data Access Layer
+  - Domain models
+  - Database repositories
+  - SQL schemas
+end note
+
+note right of "presentations"
+  Presentation Layer
+  - Flask web application
+  - HTML templates
+  - Static assets
+end note
+
+@enduml
