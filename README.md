@@ -72,3 +72,17 @@ flask --app app run --debug
 
 ## Structure
 ![img.png](docs/img.png)
+
+
+## Licence
+
+Copyright (c) 2025 Tom Vandevijver / Goethals Benoit 
+
+This source code is provided for viewing purposes only.
+
+You may NOT:
+- Use this code in any project
+- Copy, modify, or distribute this code
+- Use this code for commercial or non-commercial purposes
+
+All rights reserved.
