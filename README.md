@@ -76,7 +76,7 @@ flask --app app run --debug
 
 ## Licence
 
-Copyright (c) 2025 Tom Vandevijver / Goethals Benoit 
+Copyright (c) 2025 Tom Tom Van de Vyver/ Goethals Benoit 
 
 This source code is provided for viewing purposes only.
 
