@@ -21,7 +21,7 @@ WITH PeriodCounts AS (
         p.PLC_NAME,
         id.NUMBER AS INTERLOCK_NUMBER,
         td.MNEMONIC,
-        td.MESSAGE,
+        td.MESSAGE,d
 
         -- Current period count
         COUNT(CASE
