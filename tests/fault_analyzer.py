@@ -83,7 +83,7 @@ class InterlockPredictor:
                     best_accuracy = accuracy
                 print(f"Epoch {epoch}: Loss={loss.item():.4f}, Accuracy={accuracy:.2%}")
 
-        print(f"\nBest accuracy: {best_accuracy:.2%}")
+                print(f"\nBest accuracy: {best_accuracy:.2%}")
 
     def predict_next_fault(self, hour: int, day_of_week: int, level: int,
                            plc_encoded: int, type_encoded: int,
