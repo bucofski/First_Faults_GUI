@@ -18,7 +18,12 @@ class InterlockPredictor:
 
     def build_model(self, input_size: int, num_classes: int):
         self.model = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(input_size, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(128, 64),
@@ -27,14 +32,29 @@ class InterlockPredictor:
             nn.Linear(64, num_classes)
         ).to(self.device)
 
-    def train(self, df: pd.DataFrame, epochs: int = 100):
-        """Train to predict next likely interlock based on patterns."""
-        # Features: time patterns, PLC, level, type
+    def train(self, df: pd.DataFrame, target: str = 'Condition_Message',
+              epochs: int = 200, min_samples: int = 5):
+        """
+        Train to predict faults.
+
+        Args:
+            target: Column to predict
+            epochs: Training iterations
+            min_samples: Only include faults with at least this many occurrences
+        """
+        # Filter rare faults (hard to learn from 1-2 examples)
+        fault_counts = df[target].value_counts()
+        common_faults = fault_counts[fault_counts >= min_samples].index
+        df_filtered = df[df[target].isin(common_faults)].copy()
+
+        print(f"Filtered: {len(df)} → {len(df_filtered)} records")
+        print(f"Classes: {df[target].nunique()} → {len(common_faults)}")
+
         feature_cols = ['hour', 'day_of_week', 'Level', 'PLC_encoded',
                         'TYPE_encoded', 'Direction_encoded', 'BIT_INDEX']
 
-        X = df[feature_cols].values
-        y = self.label_encoder.fit_transform(df['Condition_Message'])
+        X = df_filtered[feature_cols].fillna(0).values
+        y = self.label_encoder.fit_transform(df_filtered[target])
 
         X = self.scaler.fit_transform(X)
 
@@ -45,7 +65,9 @@ class InterlockPredictor:
 
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=20)
 
+        best_accuracy = 0
         for epoch in range(epochs):
             self.model.train()
             optimizer.zero_grad()
@@ -53,19 +75,25 @@ class InterlockPredictor:
             loss = criterion(outputs, y_t)
             loss.backward()
             optimizer.step()
+            scheduler.step(loss.detach())  # Add .detach() here
 
             if epoch % 20 == 0:
                 accuracy = (outputs.argmax(1) == y_t).float().mean()
+                if accuracy > best_accuracy:
+                    best_accuracy = accuracy
                 print(f"Epoch {epoch}: Loss={loss.item():.4f}, Accuracy={accuracy:.2%}")
 
-    def predict_next_fault(self, plc: str, hour: int, day_of_week: int,
-                           level: int, type_encoded: int, direction: int,
-                           bit_index: int, top_k: int = 5) -> list[tuple[str, float]]:
-        """Predict most likely next faults."""
+        print(f"\nBest accuracy: {best_accuracy:.2%}")
+
+    def predict_next_fault(self, hour: int, day_of_week: int, level: int,
+                           plc_encoded: int, type_encoded: int,
+                           direction_encoded: int, bit_index: int,
+                           top_k: int = 5) -> pd.DataFrame:
+        """Predict most likely next faults with probabilities."""
         self.model.eval()
 
-        # You'd need to encode PLC the same way as training
-        features = np.array([[hour, day_of_week, level, 0, type_encoded, direction, bit_index]])
+        features = np.array([[hour, day_of_week, level, plc_encoded,
+                              type_encoded, direction_encoded, bit_index]])
         features = self.scaler.transform(features)
 
         with torch.no_grad():
@@ -76,10 +104,48 @@ class InterlockPredictor:
         predictions = []
         for prob, idx in zip(probs[0], indices[0]):
             fault_name = self.label_encoder.inverse_transform([idx.item()])[0]
-            predictions.append((fault_name, prob.item()))
+            predictions.append({
+                'Condition': fault_name,
+                'Probability': f"{prob.item():.1%}"
+            })
 
-        return predictions
+        return pd.DataFrame(predictions)
 
+    def predict_from_current_state(self, df: pd.DataFrame, top_k: int = 5) -> pd.DataFrame:
+        """Predict next likely faults based on the most recent data."""
+        latest = df.iloc[-1]
+
+        return self.predict_next_fault(
+            hour=latest['hour'],
+            day_of_week=latest['day_of_week'],
+            level=latest['Level'],
+            plc_encoded=latest['PLC_encoded'],
+            type_encoded=latest['TYPE_encoded'],
+            direction_encoded=latest['Direction_encoded'],
+            bit_index=latest['BIT_INDEX'],
+            top_k=top_k
+        )
+
+    def save_model(self, path: str = 'interlock_model.pth'):
+        """Save trained model to file."""
+        torch.save({
+            'model_state': self.model.state_dict(),
+            'scaler': self.scaler,
+            'label_encoder': self.label_encoder
+        }, path)
+        print(f"Model saved to {path}")
+
+    def load_model(self, path: str = 'interlock_model.pth', input_size: int = 7):
+        """Load trained model from file."""
+        checkpoint = torch.load(path, map_location=self.device)
+        self.scaler = checkpoint['scaler']
+        self.label_encoder = checkpoint['label_encoder']
+
+        num_classes = len(self.label_encoder.classes_)
+        self.build_model(input_size, num_classes)
+        self.model.load_state_dict(checkpoint['model_state'])
+        self.model.eval()
+        print(f"Model loaded from {path}")
 
 class PatternAnalyzer:
     """Analyze patterns in interlock occurrences without deep learning."""

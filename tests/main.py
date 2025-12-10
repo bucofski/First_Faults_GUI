@@ -33,4 +33,5 @@ print(analyzer.top_risers(days_recent=7, days_previous=30, top_n=10))
 
 # === Deep Learning Prediction (optional) ===
 predictor = InterlockPredictor()
-predictor.train(df, epochs=100)
+#predictor.train(df, epochs=300, min_samples=10)
+predictor.train(df, target='Condition_Message', epochs=1000, min_samples=5)

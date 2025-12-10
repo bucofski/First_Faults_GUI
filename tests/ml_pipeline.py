@@ -26,4 +26,9 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     df['Status_encoded'] = pd.factorize(df['Status'])[0]
     df['Direction_encoded'] = pd.factorize(df['Direction'])[0]
 
+    # Create fault category from first few words of message
+    df['Fault_Category'] = df['Condition_Message'].fillna('').apply(
+        lambda x: ' '.join(str(x).split()[:3])  # First 3 words as category
+    )
+
     return df
