@@ -1,10 +1,14 @@
-# fault_analyzer.py
 import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
 from collections import Counter
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+
+# Set random seed for reproducibility
+RANDOM_SEED = 42
+torch.manual_seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
 
 
 class InterlockPredictor:
@@ -75,7 +79,7 @@ class InterlockPredictor:
             loss = criterion(outputs, y_t)
             loss.backward()
             optimizer.step()
-            scheduler.step(loss.detach())  # Add .detach() here
+            scheduler.step(loss.detach())
 
             if epoch % 20 == 0:
                 accuracy = (outputs.argmax(1) == y_t).float().mean()
@@ -83,7 +87,7 @@ class InterlockPredictor:
                     best_accuracy = accuracy
                 print(f"Epoch {epoch}: Loss={loss.item():.4f}, Accuracy={accuracy:.2%}")
 
-                print(f"\nBest accuracy: {best_accuracy:.2%}")
+        print(f"\nBest accuracy: {best_accuracy:.2%}")
 
     def predict_next_fault(self, hour: int, day_of_week: int, level: int,
                            plc_encoded: int, type_encoded: int,
@@ -146,6 +150,63 @@ class InterlockPredictor:
         self.model.load_state_dict(checkpoint['model_state'])
         self.model.eval()
         print(f"Model loaded from {path}")
+
+    def validate(self, df: pd.DataFrame, sample_size: int = 20) -> pd.DataFrame:
+        """
+        Validate model predictions against actual data.
+
+        Shows random samples with actual vs predicted fault.
+        """
+        self.model.eval()
+
+        feature_cols = ['hour', 'day_of_week', 'Level', 'PLC_encoded',
+                        'TYPE_encoded', 'Direction_encoded', 'BIT_INDEX']
+
+        # Filter to known classes only
+        known_mask = df['Condition_Message'].isin(self.label_encoder.classes_)
+        df_valid = df[known_mask].copy()
+
+        # Fixed seed for reproducible sampling
+        sample = df_valid.sample(min(sample_size, len(df_valid)), random_state=RANDOM_SEED)
+
+        # Process all samples at once (batch) instead of one by one
+        X = sample[feature_cols].fillna(0).values
+        X_scaled = self.scaler.transform(X)
+
+        with torch.no_grad():
+            X_t = torch.FloatTensor(X_scaled).to(self.device)
+            outputs = torch.softmax(self.model(X_t), dim=1)
+            all_probs, all_indices = torch.topk(outputs, 5)
+
+        results = []
+        for i, (_, row) in enumerate(sample.iterrows()):
+            top5_faults = [self.label_encoder.inverse_transform([idx.item()])[0] for idx in all_indices[i]]
+            top5_probs = [f"{p.item():.1%}" for p in all_probs[i]]
+
+            actual = row['Condition_Message']
+            predicted = top5_faults[0]
+            in_top5 = actual in top5_faults
+
+            results.append({
+                'Actual': actual[:50] + '...' if len(str(actual)) > 50 else actual,
+                'Predicted': predicted[:50] + '...' if len(str(predicted)) > 50 else predicted,
+                'Correct': '✓' if actual == predicted else '',
+                'In_Top5': '✓' if in_top5 else '',
+                'Confidence': top5_probs[0]
+            })
+
+        results_df = pd.DataFrame(results)
+
+        # Summary stats
+        top1_acc = sum(1 for r in results if r['Correct'] == '✓') / len(results)
+        top5_acc = sum(1 for r in results if r['In_Top5'] == '✓') / len(results)
+
+        print(f"\n=== Validation Results ({len(results)} samples) ===")
+        print(f"Top-1 Accuracy: {top1_acc:.1%}")
+        print(f"Top-5 Accuracy: {top5_acc:.1%}")
+
+        return results_df
+
 
 class PatternAnalyzer:
     """Analyze patterns in interlock occurrences without deep learning."""
@@ -212,66 +273,211 @@ class PatternAnalyzer:
             'Threshold': anomaly_threshold
         })
 
-    def top_risers(self, days_recent: int = 7, days_previous: int = 30, top_n: int = 10) -> pd.DataFrame:
+    def top_risers(self, days_recent: int = 7, days_previous: int = 30,
+                   top_n: int = 10, min_recent_count: int = 3,
+                   reference_date: pd.Timestamp | None = None) -> pd.DataFrame:
         """
-        Find faults that are increasing in frequency.
-        
-        Compares recent period vs previous period to find trending issues.
-        
+        Find faults that are increasing in frequency with statistical rigor.
+
+        Improvements:
+        - Filters out statistically insignificant changes
+        - Uses confidence scoring to prioritize meaningful increases
+        - Supports fixed reference dates for reproducibility
+        - Considers both percentage change AND absolute volume
+
         Args:
             days_recent: Number of recent days to analyze
             days_previous: Number of previous days to compare against
             top_n: Number of top risers to return
+            min_recent_count: Minimum occurrences in recent period (filters noise)
+            reference_date: Fixed date to use as "now" (None = use latest data)
         """
-        now = self.df['TIMESTAMP'].max()
+        # Use fixed reference date for reproducibility
+        now = reference_date if reference_date else self.df['TIMESTAMP'].max()
         recent_start = now - pd.Timedelta(days=days_recent)
         previous_start = now - pd.Timedelta(days=days_recent + days_previous)
-        
+
         # Split data into periods
         recent = self.df[self.df['TIMESTAMP'] >= recent_start]
         previous = self.df[
-            (self.df['TIMESTAMP'] >= previous_start) & 
+            (self.df['TIMESTAMP'] >= previous_start) &
             (self.df['TIMESTAMP'] < recent_start)
-        ]
-        
+            ]
+
         # Count faults per period
         recent_counts = recent['Condition_Message'].value_counts()
         previous_counts = previous['Condition_Message'].value_counts()
-        
+
         # Normalize by number of days
         recent_daily = recent_counts / days_recent
         previous_daily = previous_counts / days_previous
-        
-        # Calculate change
-        all_faults = set(recent_counts.index) | set(previous_counts.index)
-        
+
+        # Only analyze faults with minimum recent activity
+        significant_faults = recent_counts[recent_counts >= min_recent_count].index
+
         risers = []
-        for fault in all_faults:
+        for fault in significant_faults:
             recent_rate = recent_daily.get(fault, 0)
             previous_rate = previous_daily.get(fault, 0)
-            
+            recent_count = recent_counts.get(fault, 0)
+            previous_count = previous_counts.get(fault, 0)
+
+            # Calculate percentage change
             if previous_rate > 0:
                 change_pct = ((recent_rate - previous_rate) / previous_rate) * 100
             elif recent_rate > 0:
                 change_pct = float('inf')  # New fault
             else:
                 continue
-                
+
+            # Calculate absolute change (occurrences per day)
+            absolute_change = recent_rate - previous_rate
+
+            # Confidence score: combines % change with absolute volume
+            # Higher recent counts = more confident the trend is real
+            if change_pct == float('inf'):
+                confidence_score = recent_count * 1000  # Heavily weight new faults
+            else:
+                # Score = % change weighted by sqrt of recent count
+                # sqrt dampens the effect so 100 occurrences isn't 100x more important than 1
+                confidence_score = change_pct * np.sqrt(recent_count)
+
             risers.append({
                 'Condition': fault,
                 'Recent_Daily_Avg': round(recent_rate, 2),
                 'Previous_Daily_Avg': round(previous_rate, 2),
                 'Change_%': round(change_pct, 1) if change_pct != float('inf') else 'NEW',
-                'Recent_Count': recent_counts.get(fault, 0),
-                'Previous_Count': previous_counts.get(fault, 0)
+                'Absolute_Change': round(absolute_change, 2),
+                'Recent_Count': recent_count,
+                'Previous_Count': previous_count,
+                'Confidence_Score': round(confidence_score, 1)
             })
-        
+
         risers_df = pd.DataFrame(risers)
-        
-        # Sort by change percentage (NEW faults at top, then by %)
-        risers_df['_sort'] = risers_df['Change_%'].apply(
-            lambda x: float('inf') if x == 'NEW' else x
-        )
-        risers_df = risers_df.sort_values('_sort', ascending=False).drop('_sort', axis=1)
-        
+
+        if risers_df.empty:
+            return risers_df
+
+        # Sort by confidence score (captures both % change and volume)
+        risers_df = risers_df.sort_values('Confidence_Score', ascending=False)
+
+        # Add rank column for clarity
+        risers_df.insert(0, 'Rank', range(1, len(risers_df) + 1))
+
         return risers_df.head(top_n)
+
+    def compare_time_periods(self,
+                             period1_start: pd.Timestamp,
+                             period1_end: pd.Timestamp,
+                             period2_start: pd.Timestamp,
+                             period2_end: pd.Timestamp,
+                             min_count: int = 3) -> pd.DataFrame:
+        """
+        Compare fault frequencies between any two arbitrary time periods.
+
+        More flexible than top_risers for custom analysis.
+
+        Example:
+            # Compare this week vs last week
+            analyzer.compare_time_periods(
+                period1_start=pd.Timestamp('2024-01-08'),
+                period1_end=pd.Timestamp('2024-01-14'),
+                period2_start=pd.Timestamp('2024-01-01'),
+                period2_end=pd.Timestamp('2024-01-07'),
+                min_count=2
+            )
+        """
+        period1 = self.df[
+            (self.df['TIMESTAMP'] >= period1_start) &
+            (self.df['TIMESTAMP'] <= period1_end)
+            ]
+        period2 = self.df[
+            (self.df['TIMESTAMP'] >= period2_start) &
+            (self.df['TIMESTAMP'] <= period2_end)
+            ]
+
+        period1_days = (period1_end - period1_start).days + 1
+        period2_days = (period2_end - period2_start).days + 1
+
+        p1_counts = period1['Condition_Message'].value_counts()
+        p2_counts = period2['Condition_Message'].value_counts()
+
+        p1_daily = p1_counts / period1_days
+        p2_daily = p2_counts / period2_days
+
+        # Get all faults that appear in either period with min count
+        all_faults = set(p1_counts[p1_counts >= min_count].index) | \
+                     set(p2_counts[p2_counts >= min_count].index)
+
+        comparison = []
+        for fault in all_faults:
+            p1_rate = p1_daily.get(fault, 0)
+            p2_rate = p2_daily.get(fault, 0)
+
+            if p2_rate > 0:
+                change_pct = ((p1_rate - p2_rate) / p2_rate) * 100
+            elif p1_rate > 0:
+                change_pct = float('inf')
+            else:
+                continue
+
+            comparison.append({
+                'Condition': fault,
+                'Period1_Daily': round(p1_rate, 2),
+                'Period2_Daily': round(p2_rate, 2),
+                'Change_%': round(change_pct, 1) if change_pct != float('inf') else 'NEW',
+                'Period1_Count': p1_counts.get(fault, 0),
+                'Period2_Count': p2_counts.get(fault, 0)
+            })
+
+        df = pd.DataFrame(comparison)
+        if df.empty:
+            return df
+
+        df['_sort'] = df['Change_%'].apply(lambda x: float('inf') if x == 'NEW' else x)
+        df = df.sort_values('_sort', ascending=False).drop('_sort', axis=1)
+
+        return df
+
+    def top_risers_with_context(self, days_recent: int = 7, days_previous: int = 30,
+                                top_n: int = 10) -> dict:
+        """
+        Enhanced top_risers that includes context and metadata.
+
+        Returns a dictionary with:
+        - risers_df: The main results
+        - analysis_period: Date ranges analyzed
+        - total_faults_recent: Total faults in recent period
+        - total_faults_previous: Total faults in previous period
+        - data_quality: Warnings about data quality
+        """
+        now = self.df['TIMESTAMP'].max()
+        recent_start = now - pd.Timedelta(days=days_recent)
+        previous_start = now - pd.Timedelta(days=days_recent + days_previous)
+
+        recent = self.df[self.df['TIMESTAMP'] >= recent_start]
+        previous = self.df[
+            (self.df['TIMESTAMP'] >= previous_start) &
+            (self.df['TIMESTAMP'] < recent_start)
+            ]
+
+        risers_df = self.top_risers(days_recent, days_previous, top_n)
+
+        warnings = []
+        if len(recent) < 10:
+            warnings.append(f"Low recent data: only {len(recent)} records")
+        if len(previous) < 10:
+            warnings.append(f"Low historical data: only {len(previous)} records")
+
+        return {
+            'risers_df': risers_df,
+            'analysis_period': {
+                'recent': f"{recent_start.date()} to {now.date()}",
+                'previous': f"{previous_start.date()} to {recent_start.date()}"
+            },
+            'total_faults_recent': len(recent),
+            'total_faults_previous': len(previous),
+            'unique_faults_recent': recent['Condition_Message'].nunique(),
+            'unique_faults_previous': previous['Condition_Message'].nunique(),
+            'data_quality_warnings': warnings if warnings else ['No issues detected']
+        }

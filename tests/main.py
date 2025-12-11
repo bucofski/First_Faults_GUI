@@ -3,7 +3,7 @@ from ml_pipeline import load_interlock_data, prepare_features
 from fault_analyzer import PatternAnalyzer, InterlockPredictor
 
 # Load data
-df = load_interlock_data(top_n=20000)
+df = load_interlock_data(top_n=100000)
 df = prepare_features(df)
 
 # === Pattern Analysis ===
@@ -24,18 +24,48 @@ print(analyzer.find_correlated_faults(time_window_minutes=5))
 print("\n=== Anomaly Days (unusual spike in faults) ===")
 print(analyzer.detect_anomalies())
 
-print("\n=== Top Risers (increasing faults) ===")
-print(analyzer.top_risers(days_recent=7, days_previous=30, top_n=10))
+# === NEW: Top Risers with Context ===
+print("\n=== Top Risers (increasing faults) WITH CONTEXT ===")
+result = analyzer.top_risers_with_context(days_recent=14, days_previous=30, top_n=10)
+print(f"\nAnalyzing periods:")
+print(f"  Recent: {result['analysis_period']['recent']}")
+print(f"  Previous: {result['analysis_period']['previous']}")
+print(f"\nData points:")
+print(f"  Recent faults: {result['total_faults_recent']}")
+print(f"  Previous faults: {result['total_faults_previous']}")
+print(f"  Unique faults (recent): {result['unique_faults_recent']}")
+print(f"  Unique faults (previous): {result['unique_faults_previous']}")
+print(f"\nQuality: {', '.join(result['data_quality_warnings'])}")
+print("\nTop Risers:")
+print(result['risers_df'].to_string(index=False))
 
-# === Train Predictor FIRST ===
+# === Optional: Compare specific time periods ===
+# Uncomment to compare two specific weeks
+# print("\n=== Custom Period Comparison ===")
+# import pandas as pd
+# comparison = analyzer.compare_time_periods(
+#     period1_start=pd.Timestamp('2024-12-01'),
+#     period1_end=pd.Timestamp('2024-12-07'),
+#     period2_start=pd.Timestamp('2024-11-01'),
+#     period2_end=pd.Timestamp('2024-11-07'),
+#     min_count=2
+# )
+# print(comparison.to_string(index=False))
+
+# === Train Predictor ===
 predictor = InterlockPredictor()
-predictor.train(df, target='Condition_Message', epochs=500, min_samples=10)
+predictor.train(df, target='Condition_Message', epochs=1000, min_samples=5)
 
-# === Now use it ===
+# === Validate predictions ===
+print("\n=== Model Validation ===")
+validation_results = predictor.validate(df, sample_size=20)
+print(validation_results.to_string())
+
+# === Save and predict ===
 predictor.save_model('interlock_model.pth')
 
 print("\n=== Predicted Next Faults ===")
-print(predictor.predict_from_current_state(df, top_k=10))
+print(predictor.predict_from_current_state(df, top_k=20))
 
 print("\n=== Prediction for Monday 8 AM ===")
 print(predictor.predict_next_fault(
