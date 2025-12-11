@@ -17,30 +17,37 @@ AS
 RETURN
 (
     WITH AnchorInterlock AS (
-        -- Get the anchor interlocks (TOP N based on parameter) with optional filters
-        SELECT TOP (ISNULL(@TopN, 100))
+        -- Get DISTINCT anchor interlocks (TOP N based on parameter) with optional filters
+        -- CRITICAL FIX: Include ORDER BY columns in SELECT to work with DISTINCT
+        SELECT DISTINCT TOP (ISNULL(@TopN, 100))
             il.ID as AnchorID,
             il.TIMESTAMP as AnchorTimestamp,
-            CAST(il.TIMESTAMP AS DATE) as AnchorDate
+            CAST(il.TIMESTAMP AS DATE) as AnchorDate,
+            il.ORDER_LOG as AnchorOrderLog
         FROM First_Fault.dbo.FF_INTERLOCK_LOG il
         INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
             ON il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
         INNER JOIN First_Fault.dbo.PLC p
             ON idef.PLC_ID = p.PLC_ID
-        LEFT JOIN First_Fault.dbo.FF_CONDITION_LOG cl
-            ON il.ID = cl.INTERLOCK_LOG_ID
-        LEFT JOIN First_Fault.dbo.CONDITION_DEFINITION cdef
-            ON cl.CONDITION_DEF_ID = cdef.CONDITION_DEF_ID
-        LEFT JOIN First_Fault.dbo.TEXT_DEFINITION td_condition
-            ON cdef.TEXT_DEF_ID = td_condition.TEXT_DEF_ID
         WHERE (@TargetBSID IS NULL OR idef.NUMBER = @TargetBSID)
             -- Apply optional filters
             AND (@FilterDate IS NULL OR CAST(il.TIMESTAMP AS DATE) = @FilterDate)
             AND (@FilterTimestampStart IS NULL OR il.TIMESTAMP >= @FilterTimestampStart)
             AND (@FilterTimestampEnd IS NULL OR il.TIMESTAMP <= @FilterTimestampEnd)
             AND (@FilterPLC IS NULL OR p.PLC_NAME = @FilterPLC)
-            AND (@FilterConditionMessage IS NULL OR td_condition.MESSAGE LIKE '%' + @FilterConditionMessage + '%')
-        ORDER BY il.TIMESTAMP DESC, il.ORDER_LOG DESC
+            -- Condition message filter applied separately below
+            AND (@FilterConditionMessage IS NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM First_Fault.dbo.FF_CONDITION_LOG cl2
+                    INNER JOIN First_Fault.dbo.CONDITION_DEFINITION cdef2
+                        ON cl2.CONDITION_DEF_ID = cdef2.CONDITION_DEF_ID
+                    INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_condition2
+                        ON cdef2.TEXT_DEF_ID = td_condition2.TEXT_DEF_ID
+                    WHERE cl2.INTERLOCK_LOG_ID = il.ID
+                        AND td_condition2.MESSAGE LIKE '%' + @FilterConditionMessage + '%'
+                ))
+        ORDER BY il.TIMESTAMP DESC, il.ORDER_LOG DESC, il.ID DESC
     ),
     UpstreamChain AS (
         -- Anchor: Start with selected interlocks
