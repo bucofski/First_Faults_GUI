@@ -48,6 +48,7 @@ BEGIN TRY
 
     -- ========================================================================
     -- STEP 2: Populate TEXT_DEFINITION (all unique MNEMONIC+MESSAGE pairs)
+    -- FIX: Cast TEXT columns to NVARCHAR(MAX) for comparison
     -- ========================================================================
     PRINT 'Step 2: Migrating TEXT_DEFINITION (unique MNEMONIC+MESSAGE pairs)...';
 
@@ -78,6 +79,7 @@ BEGIN TRY
     -- ========================================================================
     -- STEP 3: Populate INTERLOCK_DEFINITION
     -- Uses the MOST RECENT (latest timestamp) text for each PLC+NUMBER
+    -- FIX: Cast TEXT columns to NVARCHAR(MAX) for comparison
     -- ========================================================================
     PRINT 'Step 3: Migrating Interlock Definitions...';
 
@@ -116,6 +118,7 @@ BEGIN TRY
     -- ========================================================================
     -- STEP 4: Populate CONDITION_DEFINITION
     -- INCLUDES INTERLOCK_NUMBER in the definition
+    -- FIX: Cast TEXT columns to NVARCHAR(MAX) for comparison
     -- ========================================================================
     PRINT 'Step 4: Migrating Condition Definitions (WITH INTERLOCK_NUMBER)...';
 
@@ -163,7 +166,7 @@ BEGIN TRY
     -- ========================================================================
     PRINT 'Step 5: Preparing Interlock Log data (TOP 1000000)...';
 
-    SELECT TOP 1000000
+    SELECT TOP 10000
         old_il.ID as Old_ID,
         idef.INTERLOCK_DEF_ID,
         old_il.TIMESTAMP,
