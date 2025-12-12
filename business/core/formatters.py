@@ -48,6 +48,7 @@ class ConsoleResultFormatter(ResultFormatter):
             f"{prefix}Level {node.level}:",
             f"{prefix}  ID: {node.interlock_log_id}",
             f"{prefix}  BSID: {node.bsid}",
+            f"{prefix}  Condition_Mnemonic: {node.condition_mnemonic}",
             f"{prefix}  Message: {node.interlock_message}",
             f"{prefix}  Status: {node.status}",
         ]

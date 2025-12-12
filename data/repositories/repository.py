@@ -12,9 +12,10 @@ class InterlockRepository:
     """Repository for interlock data access using session context manager."""
 
     TVF_COLUMNS = (
-        "Date", "TIMESTAMP", "Level", "Interlock_Log_ID", "BSID",
-        "PLC", "Direction", "Interlock_Message", "Status",
-        "TYPE", "BIT_INDEX", "Condition_Message"
+        "AnchorReference", "Date", "Level", "Direction", "Interlock_Log_ID",
+        "TIMESTAMP", "PLC", "BSID", "Interlock_Message",
+        "TYPE", "BIT_INDEX", "Condition_Mnemonic", "Condition_Message",
+        "UPSTREAM_INTERLOCK_REF", "Status"
     )
 
     def get_interlock_chain(
@@ -24,31 +25,25 @@ class InterlockRepository:
         filter_date: datetime | None = None,
         filter_timestamp_start: datetime | None = None,
         filter_timestamp_end: datetime | None = None,
+        filter_condition_mnemonic: str | None = None,
         filter_condition_message: str | None = None,
         filter_plc: str | None = None
     ) -> pd.DataFrame:
         """
         Retrieve interlock chain data with upstream/downstream tracing.
-
-        Args:
-            target_bsid: Optional BSID. If NULL, returns last interlocks with their full trees
-            top_n: Number of results to return (default in SQL: 10). If None, uses SQL default
-            filter_date: Optional filter by specific date
-            filter_timestamp_start: Optional filter by timestamp range start
-            filter_timestamp_end: Optional filter by timestamp range end
-            filter_condition_message: Optional search text in condition message
-            filter_plc: Optional filter by PLC name
-
-        Returns:
-            DataFrame with interlock chain data
         """
+        # ... existing code ...
+        # SQL function supports only ONE condition filter parameter that matches message OR mnemonic.
+        # If caller provided mnemonic-only, treat it as the same filter.
+        condition_filter = filter_condition_message or filter_condition_mnemonic
+
         interlock_func = func.dbo.fn_InterlockChain(
             target_bsid,
             top_n,
             filter_date,
             filter_timestamp_start,
             filter_timestamp_end,
-            filter_condition_message,
+            condition_filter,
             filter_plc
         ).table_valued(*self.TVF_COLUMNS)
 

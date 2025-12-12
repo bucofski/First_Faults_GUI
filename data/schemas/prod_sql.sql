@@ -9,7 +9,7 @@ CREATE FUNCTION dbo.fn_InterlockChain (
     @FilterDate DATE = NULL,  -- Optional: Filter by specific date
     @FilterTimestampStart DATETIME = NULL,  -- Optional: Filter by timestamp range start
     @FilterTimestampEnd DATETIME = NULL,  -- Optional: Filter by timestamp range end
-    @FilterConditionMessage NVARCHAR(255) = NULL,  -- Optional: Search text in condition message
+    @FilterConditionMessage NVARCHAR(255) = NULL,  -- Optional: Search text in condition message or mnemonic
     @FilterPLC NVARCHAR(50) = NULL  -- Optional: Filter by PLC name
 )
 RETURNS TABLE
@@ -45,7 +45,8 @@ RETURN
                     INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_condition2
                         ON cdef2.TEXT_DEF_ID = td_condition2.TEXT_DEF_ID
                     WHERE cl2.INTERLOCK_LOG_ID = il.ID
-                        AND td_condition2.MESSAGE LIKE '%' + @FilterConditionMessage + '%'
+                        AND (td_condition2.MESSAGE LIKE '%' + @FilterConditionMessage + '%'
+                             OR td_condition2.MNEMONIC LIKE '%' + @FilterConditionMessage + '%')
                 ))
         ORDER BY il.TIMESTAMP DESC, il.ORDER_LOG DESC, il.ID DESC
     ),
@@ -166,7 +167,12 @@ RETURN
         cc.Interlock_Message,
         cdef.TYPE,
         cdef.BIT_INDEX,
-        td_condition.MESSAGE as Condition_Message,
+        td_condition.MNEMONIC as Condition_Mnemonic,
+        CASE
+            WHEN td_condition.MESSAGE IS NULL OR LTRIM(RTRIM(td_condition.MESSAGE)) = ''
+            THEN td_condition.MNEMONIC
+            ELSE td_condition.MESSAGE
+        END as Condition_Message,
         cc.UPSTREAM_INTERLOCK_REF,
         CASE
             WHEN cc.UPSTREAM_INTERLOCK_REF IS NULL AND cc.Direction = 'UPSTREAM' THEN '*** ROOT CAUSE ***'
