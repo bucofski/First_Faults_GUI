@@ -40,7 +40,8 @@ class PdfGenerator:
                 conds = getattr(n, "conditions", None) or []
                 if conds:
                     cond_text = "<br/>".join(
-                        (getattr(c, "message", None) or "").strip() or "N/A" for c in conds
+                        f"[Bit {getattr(c, 'bit_index', 'N/A')}] {(getattr(c, 'message', None) or '').strip() or 'N/A'}"
+                        for c in conds
                     )
                 else:
                     cond_text = "-"
@@ -49,7 +50,6 @@ class PdfGenerator:
                     f"{indent}{caret}<b>Level {level}</b> - {msg}",
                     getattr(n, "bsid", None) or "N/A",
                     getattr(n, "plc", None) or "N/A",
-                    getattr(n, "bit_index", None) or "N/A",
                     getattr(n, "direction", None) or "N/A",
                     str(getattr(n, "timestamp", None) or "N/A"),
                     getattr(n, "status", None) or "N/A",
@@ -112,7 +112,7 @@ class PdfGenerator:
             Spacer(1, 6),
         ]
 
-        header = ["Interlock Message", "BSID", "PLC", "BITINDEX", "Direction", "Timestamp", "Status", "Conditions"]
+        header = ["Interlock Message", "BSID", "PLC", "Direction", "Timestamp", "Status", "Conditions"]
         data = [header]
 
         if rows:
