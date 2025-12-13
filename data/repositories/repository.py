@@ -22,6 +22,7 @@ class InterlockRepository:
         self,
         target_bsid: int | None = None,
         top_n: int | None = None,
+        filter_bit_index: int | None = None,
         filter_date: datetime | None = None,
         filter_timestamp_start: datetime | None = None,
         filter_timestamp_end: datetime | None = None,
@@ -44,7 +45,7 @@ class InterlockRepository:
             filter_timestamp_start,
             filter_timestamp_end,
             condition_filter,
-            filter_plc
+            filter_plc,
         ).table_valued(*self.TVF_COLUMNS)
 
         stmt = (
