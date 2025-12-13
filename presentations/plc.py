@@ -7,11 +7,13 @@ from flask import (
     render_template,
     request,
     url_for, get_flashed_messages,
+    send_file,
 )
 
 from business.services.analyzer import InterlockAnalyzer
 from business.services.diagram_service_view import DiagramService
-from data.model.models import InterlockNode
+
+from presentations.services.pdf_generator import PdfGenerator
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 service_interlock = InterlockAnalyzer()
@@ -44,7 +46,52 @@ def diagrams():
     pie_html = DiagramService.pie_chart_html()
     return render_template("diagrams.html", title="Diagrams", chart_html=chart_html, chart_2_html=chart_html2,
                            pie_html=pie_html)
+@bp.route("/pdf-table_tree_export-tree", methods=["POST"])
+def table_tree_export():
+    # Read same fields as table_tree
+    target_bsid_str = request.form.get("target_bsid", "").strip()
+    top_n_str = request.form.get("top_n", "").strip()
+    filter_date = request.form.get("filter_date", "").strip() or None
+    filter_timestamp_start = request.form.get("filter_timestamp_start", "").strip() or None
+    filter_timestamp_end = request.form.get("filter_timestamp_end", "").strip() or None
+    filter_condition_message = request.form.get("filter_condition_message", "").strip() or None
+    filter_plc = request.form.get("filter_plc", "").strip() or None
 
+    target_bsid = None
+    top_n = None
+
+    if target_bsid_str:
+        try:
+            target_bsid = int(target_bsid_str)
+        except ValueError:
+            flash("Target BSID must be a valid integer.", "error")
+            return redirect(url_for("plc.table_tree"))
+
+    if top_n_str:
+        try:
+            top_n = int(top_n_str)
+        except ValueError:
+            flash("Top N must be a valid integer.", "error")
+            return redirect(url_for("plc.table_tree"))
+
+    # Fetch the same data you show in the UI
+    items = service_interlock.analyze_interlock(
+        target_bsid=target_bsid,
+        top_n=top_n,
+        filter_date=filter_date,
+        filter_timestamp_start=filter_timestamp_start,
+        filter_timestamp_end=filter_timestamp_end,
+        filter_condition_message=filter_condition_message,
+        filter_plc=filter_plc,
+    )
+    buf=PdfGenerator().generate_interlock(items)
+
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="table_tree_export.pdf",
+    )
 
 # ... existing code ...
 @bp.route("/table-tree", methods=["GET", "POST"])

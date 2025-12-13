@@ -80,6 +80,15 @@
 
     <div class="form-row">
         <button type="submit" class="btn btn-primary" id="submit-btn">Load</button>
+
+        <button type="button"
+                class="btn btn-secondary"
+                id="pdf-btn"
+                data-pdf-url="{{ url_for('plc.table_tree_export') }}">
+            Pdf
+        </button>
+
+        <button type="button" class="btn btn-secondary" id="reset-btn">Reset</button>
     </div>
 </form>
 
@@ -347,12 +356,66 @@
 </style>
 
 <script>
-    document.getElementById("bsid-form").addEventListener("submit", function() {
-        const overlay = document.getElementById("loading-overlay");
-        const btn = document.getElementById("submit-btn");
+    const form = document.getElementById("bsid-form");
+    const overlay = document.getElementById("loading-overlay");
+    const loadBtn = document.getElementById("submit-btn");
+    const pdfBtn = document.getElementById("pdf-btn");
+
+    // Show overlay only for "Load" (normal form submit)
+    form.addEventListener("submit", function () {
+        overlay.classList.add("active");
+        loadBtn.disabled = true;
+    });
+
+    // PDF download via fetch -> always disable overlay when response arrives
+    pdfBtn.addEventListener("click", async function () {
+        const pdfUrl = pdfBtn.dataset.pdfUrl;
 
         overlay.classList.add("active");
-        btn.disabled = true;
+        pdfBtn.disabled = true;
+
+        try {
+            const fd = new FormData(form);
+
+            const resp = await fetch(pdfUrl, {
+                method: "POST",
+                body: fd,
+                credentials: "same-origin"
+            });
+
+            if (!resp.ok) {
+                const txt = await resp.text();
+                throw new Error(`PDF export failed (${resp.status}). ${txt}`);
+            }
+
+            const blob = await resp.blob();
+
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = objectUrl;
+
+            // Try to honor filename from server; fallback if missing
+            const cd = resp.headers.get("Content-Disposition") || "";
+            const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i);
+            a.download = m ? decodeURIComponent(m[1]) : "table_tree_export.pdf";
+
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (e) {
+            console.error(e);
+            alert("Could not generate/download the PDF. Check server logs for details.");
+        } finally {
+            overlay.classList.remove("active");
+            pdfBtn.disabled = false;
+            loadBtn.disabled = false;
+        }
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", function () {
+        form.reset();
+        window.location.href = "{{ url_for('plc.table_tree') }}";
     });
 
     document.addEventListener("click", function (e) {
