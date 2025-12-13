@@ -7,7 +7,6 @@ from business.services.analyzer import InterlockAnalyzer
 from business.core.formatters import DictionaryResultFormatter, ConsoleResultFormatter
 
 
-
 def main(
     target_bsid: int | None = None,
     top_n: int | None = None,
@@ -41,13 +40,15 @@ def main(
             print("⚠️  No data found")
             return 0
 
-        trees = analyzer.analyze_interlock(target_bsid,
-            top_n,
-            filter_date,
-            filter_timestamp_start,
-            filter_timestamp_end,
-            filter_condition_message,
-            filter_plc)
+        trees = analyzer.analyze_interlock(
+            target_bsid=target_bsid,
+            top_n=top_n,
+            filter_date=filter_date,
+            filter_timestamp_start=filter_timestamp_start,
+            filter_timestamp_end=filter_timestamp_end,
+            filter_condition_message=filter_condition_message,
+            filter_plc=filter_plc,
+        )
 
         # Dictionary output
         dict_formatter = DictionaryResultFormatter()

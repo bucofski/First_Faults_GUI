@@ -1,8 +1,9 @@
 -- ============================================================================
--- MIGRATION SCRIPT: TD2 to First_Fault (CORRECTED - FIRST 5000 RECORDS)
+-- MIGRATION SCRIPT: TD2 to First_Fault (CORRECTED - TEXT TYPE FIX)
 -- ============================================================================
--- KEY FIX: CONDITION_DEFINITION now includes INTERLOCK_NUMBER
--- This is necessary because TYPE+BIT_INDEX is only unique within each interlock
+-- KEY FIXES:
+-- 1. CONDITION_DEFINITION includes INTERLOCK_NUMBER
+-- 2. Proper handling of TEXT data type using CAST to NVARCHAR(MAX)
 -- ============================================================================
 
 USE First_Fault;
@@ -45,25 +46,26 @@ BEGIN TRY
 
     -- ========================================================================
     -- STEP 2: Populate TEXT_DEFINITION (all unique MNEMONIC+MESSAGE pairs)
+    -- FIX: Cast TEXT columns to NVARCHAR(MAX) for comparison
     -- ========================================================================
     PRINT 'Step 2: Migrating TEXT_DEFINITION (unique MNEMONIC+MESSAGE pairs)...';
 
     INSERT INTO First_Fault.dbo.TEXT_DEFINITION (MNEMONIC, MESSAGE)
     SELECT DISTINCT
-        MNEMONIC COLLATE Latin1_General_CI_AS as MNEMONIC,
-        MESSAGE COLLATE Latin1_General_CI_AS as MESSAGE
+        CAST(MNEMONIC AS NVARCHAR(MAX)) COLLATE Latin1_General_CI_AS as MNEMONIC,
+        CAST(MESSAGE AS NVARCHAR(MAX)) COLLATE Latin1_General_CI_AS as MESSAGE
     FROM (
         SELECT DISTINCT
-            MNEMONIC,
-            MESSAGE
+            CAST(MNEMONIC AS NVARCHAR(MAX)) as MNEMONIC,
+            CAST(MESSAGE AS NVARCHAR(MAX)) as MESSAGE
         FROM TD2.dbo.FF_INTERLOCK_LOG
         WHERE MNEMONIC IS NOT NULL AND MESSAGE IS NOT NULL
 
         UNION
 
         SELECT DISTINCT
-            MNEMONIC,
-            MESSAGE
+            CAST(MNEMONIC AS NVARCHAR(MAX)) as MNEMONIC,
+            CAST(MESSAGE AS NVARCHAR(MAX)) as MESSAGE
         FROM TD2.dbo.FF_CONDITION_LOG
         WHERE MNEMONIC IS NOT NULL AND MESSAGE IS NOT NULL
     ) AS AllTexts
@@ -75,6 +77,7 @@ BEGIN TRY
     -- ========================================================================
     -- STEP 3: Populate INTERLOCK_DEFINITION
     -- Uses the MOST RECENT (latest timestamp) text for each PLC+NUMBER
+    -- FIX: Cast TEXT columns to NVARCHAR(MAX) for comparison
     -- ========================================================================
     PRINT 'Step 3: Migrating Interlock Definitions...';
 
@@ -83,8 +86,8 @@ BEGIN TRY
         SELECT
             il.PLC,
             il.NUMBER,
-            il.MNEMONIC,
-            il.MESSAGE,
+            CAST(il.MNEMONIC AS NVARCHAR(MAX)) as MNEMONIC,
+            CAST(il.MESSAGE AS NVARCHAR(MAX)) as MESSAGE,
             il.TIMESTAMP,
             ROW_NUMBER() OVER (
                 PARTITION BY il.PLC, il.NUMBER
@@ -114,7 +117,7 @@ BEGIN TRY
     -- ========================================================================
     -- STEP 4: Populate CONDITION_DEFINITION
     -- CRITICAL FIX: Now includes INTERLOCK_NUMBER in the definition
-    -- This is because TYPE+BIT_INDEX is only unique WITHIN each interlock
+    -- FIX: Cast TEXT columns to NVARCHAR(MAX) for comparison
     -- ========================================================================
     PRINT 'Step 4: Migrating Condition Definitions (WITH INTERLOCK_NUMBER)...';
 
@@ -125,8 +128,8 @@ BEGIN TRY
             il.NUMBER as INTERLOCK_NUMBER,
             cl.TYPE,
             cl.BIT_INDEX,
-            cl.MNEMONIC,
-            cl.MESSAGE,
+            CAST(cl.MNEMONIC AS NVARCHAR(MAX)) as MNEMONIC,
+            CAST(cl.MESSAGE AS NVARCHAR(MAX)) as MESSAGE,
             il.TIMESTAMP,
             ROW_NUMBER() OVER (
                 PARTITION BY il.PLC, il.NUMBER, cl.TYPE, cl.BIT_INDEX
@@ -159,25 +162,25 @@ BEGIN TRY
     PRINT 'Condition Definitions migrated: ' + CAST(@RowCount AS NVARCHAR(10));
 
     -- ========================================================================
-    -- STEP 5: Prepare Interlock Log data - FIRST 5000 RECORDS ONLY
+    -- STEP 5: Prepare Interlock Log data - LIMITED RECORDS
     -- ========================================================================
-    PRINT 'Step 5: Preparing Interlock Log data (TOP 5000)...';
+    PRINT 'Step 5: Preparing Interlock Log data (TOP 1000000)...';
 
-    SELECT TOP 300000
-            old_il.ID as Old_ID,
-            idef.INTERLOCK_DEF_ID,
-            old_il.TIMESTAMP,
-            old_il.TIMESTAMP_LOG,
-            ISNULL(old_il.ORDER_LOG, 0) as ORDER_LOG
-        INTO #TempInterlockLog
-        FROM TD2.dbo.FF_INTERLOCK_LOG old_il
-        INNER JOIN First_Fault.dbo.PLC p
-            ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
-        INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
-            ON p.PLC_ID = idef.PLC_ID
-            AND old_il.NUMBER = idef.NUMBER
-        WHERE old_il.NUMBER IS NOT NULL  -- Only records with valid NUMBER
-        ORDER BY old_il.TIMESTAMP DESC, old_il.ID DESC;
+    SELECT TOP 1000000
+        old_il.ID as Old_ID,
+        idef.INTERLOCK_DEF_ID,
+        old_il.TIMESTAMP,
+        old_il.TIMESTAMP_LOG,
+        ISNULL(old_il.ORDER_LOG, 0) as ORDER_LOG
+    INTO #TempInterlockLog
+    FROM TD2.dbo.FF_INTERLOCK_LOG old_il
+    INNER JOIN First_Fault.dbo.PLC p
+        ON old_il.PLC COLLATE Latin1_General_CI_AS = p.PLC_NAME
+    INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
+        ON p.PLC_ID = idef.PLC_ID
+        AND old_il.NUMBER = idef.NUMBER
+    WHERE old_il.NUMBER IS NOT NULL  -- Only records with valid NUMBER
+    ORDER BY old_il.TIMESTAMP DESC, old_il.ID DESC;
 
     -- ID mapping with GUID support
     SELECT
@@ -188,7 +191,7 @@ BEGIN TRY
 
     DECLARE @TempCount INT;
     SELECT @TempCount = COUNT(*) FROM #TempInterlockLog;
-    PRINT 'Temp tables created with ' + CAST(@TempCount AS NVARCHAR(10)) + ' records (LIMITED TO 5000)';
+    PRINT 'Temp tables created with ' + CAST(@TempCount AS NVARCHAR(10)) + ' records';
 
     -- ========================================================================
     -- STEP 6: Insert Interlock Log records and build ID mapping
@@ -312,7 +315,7 @@ BEGIN TRY
     -- ========================================================================
     PRINT '';
     PRINT '========================================================================';
-    PRINT 'MIGRATION SUMMARY: TD2 → First_Fault (TEST - 5000 Records)';
+    PRINT 'MIGRATION SUMMARY: TD2 → First_Fault';
     PRINT '========================================================================';
     PRINT '';
 
@@ -337,12 +340,12 @@ BEGIN TRY
     PRINT 'Total Interlock Log:       ' + CAST(@TD2_InterlockCount AS NVARCHAR(10));
     PRINT 'Total Condition Log:       ' + CAST(@TD2_ConditionCount AS NVARCHAR(10));
     PRINT '';
-    PRINT '--- TARGET (First_Fault) - TEST RUN ---';
+    PRINT '--- TARGET (First_Fault) ---';
     PRINT 'PLCs:                      ' + CAST(@FF_PLCCount AS NVARCHAR(10));
     PRINT 'Text Definitions:          ' + CAST(@FF_TextDefCount AS NVARCHAR(10));
     PRINT 'Interlock Definitions:     ' + CAST(@FF_InterlockDefCount AS NVARCHAR(10));
     PRINT 'Condition Definitions:     ' + CAST(@FF_ConditionDefCount AS NVARCHAR(10));
-    PRINT 'Interlock Log Entries:     ' + CAST(@FF_InterlockLogCount AS NVARCHAR(10)) + ' (MAX 100000)';
+    PRINT 'Interlock Log Entries:     ' + CAST(@FF_InterlockLogCount AS NVARCHAR(10)) + ' (MAX 1000000)';
     PRINT 'Condition Log Entries:     ' + CAST(@FF_ConditionLogCount AS NVARCHAR(10));
     PRINT 'Upstream References:       ' + CAST(@FF_UpstreamCount AS NVARCHAR(10));
     PRINT '';
@@ -351,9 +354,10 @@ BEGIN TRY
     COMMIT TRANSACTION;
 
     PRINT '';
-    PRINT '✓ TEST MIGRATION COMPLETED SUCCESSFULLY!';
-    PRINT '  (First 5000 interlock records only)';
-    PRINT '  KEY FIX APPLIED: CONDITION_DEFINITION now includes INTERLOCK_NUMBER';
+    PRINT '✓ MIGRATION COMPLETED SUCCESSFULLY!';
+    PRINT '  KEY FIXES APPLIED:';
+    PRINT '  - CONDITION_DEFINITION includes INTERLOCK_NUMBER';
+    PRINT '  - TEXT data type properly handled with CAST to NVARCHAR(MAX)';
     PRINT '';
 
 END TRY

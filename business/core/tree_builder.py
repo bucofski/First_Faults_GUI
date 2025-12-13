@@ -67,6 +67,10 @@ class InterlockTreeBuilder:
         level_data = chain_df[chain_df["Level"] == level]
         first_row = level_data.iloc[0]
 
+        condition_mnemonic = first_row.get("Condition_Mnemonic")
+        if pd.isna(condition_mnemonic) or str(condition_mnemonic).strip() == "":
+            condition_mnemonic = first_row.get("Condition_Message")
+
         conditions = InterlockTreeBuilder._extract_conditions(level_data)
 
         return InterlockNode(
@@ -76,6 +80,7 @@ class InterlockTreeBuilder:
             plc=InterlockTreeBuilder._clean_plc(first_row.get("PLC")),
             direction=first_row.get("Direction"),
             timestamp=InterlockTreeBuilder._format_timestamp(first_row.get("TIMESTAMP")),
+            condition_mnemonic=condition_mnemonic,
             interlock_message=first_row.get("Interlock_Message"),
             status=first_row.get("Status"),
             conditions=conditions

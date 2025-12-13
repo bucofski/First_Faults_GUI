@@ -29,6 +29,7 @@ class InterlockAnalyzer:
             filter_date=None,
             filter_timestamp_start=None,
             filter_timestamp_end=None,
+            filter_mnemonic: str | None = None,
             filter_condition_message: str | None = None,
             filter_plc: str | None = None,
             formatter: ResultFormatter | None = None
@@ -43,6 +44,7 @@ class InterlockAnalyzer:
             filter_date=filter_date,
             filter_timestamp_start=filter_timestamp_start,
             filter_timestamp_end=filter_timestamp_end,
+            filter_condition_mnemonic=filter_mnemonic,
             filter_condition_message=filter_condition_message,
             filter_plc=filter_plc
         )

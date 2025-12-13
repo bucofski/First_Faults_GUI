@@ -28,6 +28,7 @@ class InterlockNode:
     plc: str | None
     direction: str | None
     timestamp: str | None
+    condition_mnemonic: str | None
     interlock_message: str | None
     status: str | None
     conditions: list[InterlockCondition] = field(default_factory=list)
@@ -42,6 +43,7 @@ class InterlockNode:
             "plc": self.plc,
             "direction": self.direction,
             "timestamp": self.timestamp,
+            "condition_mnemonic": self.condition_mnemonic,
             "interlock_message": self.interlock_message,
             "status": self.status,
             "conditions": [cond.to_dict() for cond in self.conditions],
