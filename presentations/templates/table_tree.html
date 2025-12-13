@@ -35,6 +35,7 @@
                    placeholder="PLC Name"
                    class="form-control">
         </div>
+
     </div>
 
     <div class="form-row">
@@ -62,6 +63,8 @@
                    value="{{ filter_timestamp_end or '' }}"
                    class="form-control">
         </div>
+
+
     </div>
 
     <div class="form-row">
@@ -130,7 +133,9 @@
         {% if node.conditions %}
         <ul class="conditions-list">
             {% for cond in node.conditions %}
-            <li>{{ cond.message }}</li>
+            <li>bit index :{{ cond.bit_index }}</li>
+            <li>msg :{{ cond.message }}</li>
+                <br/>
             {% endfor %}
         </ul>
         {% else %}

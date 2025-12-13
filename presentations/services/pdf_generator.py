@@ -40,7 +40,8 @@ class PdfGenerator:
                 conds = getattr(n, "conditions", None) or []
                 if conds:
                     cond_text = "<br/>".join(
-                        (getattr(c, "message", None) or "").strip() or "N/A" for c in conds
+                        f"[Bit {getattr(c, 'bit_index', 'N/A')}] {(getattr(c, 'message', None) or '').strip() or 'N/A'}"
+                        for c in conds
                     )
                 else:
                     cond_text = "-"

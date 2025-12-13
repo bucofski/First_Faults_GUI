@@ -44,7 +44,7 @@ class InterlockRepository:
             filter_timestamp_start,
             filter_timestamp_end,
             condition_filter,
-            filter_plc
+            filter_plc,
         ).table_valued(*self.TVF_COLUMNS)
 
         stmt = (
