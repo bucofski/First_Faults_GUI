@@ -49,6 +49,7 @@ class PdfGenerator:
                     f"{indent}{caret}<b>Level {level}</b> - {msg}",
                     getattr(n, "bsid", None) or "N/A",
                     getattr(n, "plc", None) or "N/A",
+                    getattr(n, "bit_index", None) or "N/A",
                     getattr(n, "direction", None) or "N/A",
                     str(getattr(n, "timestamp", None) or "N/A"),
                     getattr(n, "status", None) or "N/A",
@@ -111,7 +112,7 @@ class PdfGenerator:
             Spacer(1, 6),
         ]
 
-        header = ["Interlock Message", "BSID", "PLC", "Direction", "Timestamp", "Status", "Conditions"]
+        header = ["Interlock Message", "BSID", "PLC", "BITINDEX", "Direction", "Timestamp", "Status", "Conditions"]
         data = [header]
 
         if rows:

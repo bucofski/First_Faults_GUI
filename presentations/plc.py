@@ -152,6 +152,7 @@ def table_tree():
             filter_timestamp_end=filter_timestamp_end,
             filter_condition_message=filter_condition_message,
             filter_plc=filter_plc
+
         )
 
     flashed = get_flashed_messages(with_categories=True)
