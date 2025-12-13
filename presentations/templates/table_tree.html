@@ -35,15 +35,7 @@
                    placeholder="PLC Name"
                    class="form-control">
         </div>
-        <div class="form-group">
-            <label for="filter_bit_index">Bit Index</label>
-            <input type="number"
-                   id="filter_bit_index"
-                   name="filter_bit_index"
-                   placeholder="Bit Index"
-                   value="{{ filter_bit_index or '' }}"
-                   class="form-control">
-        </div>
+
     </div>
 
     <div class="form-row">
@@ -130,7 +122,6 @@
     </td>
     <td>{{ node.bsid or 'N/A' }}</td>
     <td>{{ node.plc or 'N/A' }}</td>
-    <td>{{ node.bit_index or 'N/A' }}</td>
     <td>{{ node.direction or 'N/A' }}</td>
     <td>{{ node.timestamp or 'N/A' }}</td>
     <td>
@@ -142,7 +133,9 @@
         {% if node.conditions %}
         <ul class="conditions-list">
             {% for cond in node.conditions %}
-            <li>{{ cond.message }}</li>
+            <li>bit index :{{ cond.bit_index }}</li>
+            <li>msg :{{ cond.message }}</li>
+                <br/>
             {% endfor %}
         </ul>
         {% else %}
@@ -161,7 +154,6 @@
         <th>Interlock Message</th>
         <th>BSID</th>
         <th>PLC</th>
-        <th>Bit Index</th>
         <th>Direction</th>
         <th>Timestamp</th>
         <th>Status</th>

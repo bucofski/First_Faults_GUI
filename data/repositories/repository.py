@@ -22,7 +22,6 @@ class InterlockRepository:
         self,
         target_bsid: int | None = None,
         top_n: int | None = None,
-        filter_bit_index: int | None = None,
         filter_date: datetime | None = None,
         filter_timestamp_start: datetime | None = None,
         filter_timestamp_end: datetime | None = None,
