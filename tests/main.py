@@ -54,7 +54,7 @@ print(result['risers_df'].to_string(index=False))
 
 # === Train Predictor ===
 predictor = InterlockPredictor()
-predictor.train(df, target='Condition_Message', epochs=1000, min_samples=5)
+predictor.train(df, target="Condition_Mnemonic", epochs=200, min_samples=5)
 
 # === Validate predictions ===
 print("\n=== Model Validation ===")
@@ -65,7 +65,7 @@ print(validation_results.to_string())
 predictor.save_model('interlock_model.pth')
 
 print("\n=== Predicted Next Faults ===")
-print(predictor.predict_from_current_state(df, top_k=20))
+print(predictor.predict_from_current_state(df, top_k=10))
 
 print("\n=== Prediction for Monday 8 AM ===")
 print(predictor.predict_next_fault(

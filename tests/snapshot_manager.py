@@ -42,7 +42,7 @@ class TrendSnapshotManager:
         for idx, row in result.iterrows():
             records.append({
                 'snapshot_date': snapshot_date,
-                'condition_message': row['Condition'][:500],  # Truncate if needed
+                'condition_mnemonic': row['Condition'][:500],  # Truncate if needed
                 'days_recent': days_recent,
                 'days_previous': days_previous,
                 'recent_daily_avg': row['Recent_Daily_Avg'],
@@ -63,10 +63,10 @@ class TrendSnapshotManager:
         """Insert snapshot records into database."""
         query = """
                 INSERT INTO fault_trend_snapshots
-                (snapshot_date, condition_message, days_recent, days_previous,
+                (snapshot_date, condition_mnemonic, days_recent, days_previous,
                  recent_daily_avg, previous_daily_avg, change_percent, absolute_change,
                  recent_count, previous_count, confidence_score, rank_position)
-                VALUES (%(snapshot_date)s, %(condition_message)s, %(days_recent)s,
+                VALUES (%(snapshot_date)s, %(condition_mnemonic)s, %(days_recent)s,
                         %(days_previous)s, %(recent_daily_avg)s, %(previous_daily_avg)s,
                         %(change_percent)s, %(absolute_change)s, %(recent_count)s,
                         %(previous_count)s, %(confidence_score)s, %(rank_position)s) ON DUPLICATE KEY \
@@ -87,12 +87,12 @@ class TrendSnapshotManager:
                 cursor.executemany(query, records)
             conn.commit()
 
-    def get_fault_trend_history(self, condition_message, limit=12):
+    def get_fault_trend_history(self, condition_mnemonic, limit=12):
         """
         Get historical trend for a specific fault (last N snapshots).
 
         Args:
-            condition_message: The fault to track
+            condition_mnemonic The fault to track
             limit: Number of snapshots to retrieve (default 12 = ~3 months weekly)
 
         Returns:
@@ -106,7 +106,7 @@ class TrendSnapshotManager:
                        confidence_score, \
                        rank_position
                 FROM fault_trend_snapshots
-                WHERE condition_message = %s
+                WHERE condition_mnemonic = %s
                   AND days_recent = 7 \
                   AND days_previous = 30
                 ORDER BY snapshot_date DESC
@@ -114,7 +114,7 @@ class TrendSnapshotManager:
                 """
 
         with self.repo.get_connection() as conn:
-            df = pd.read_sql(query, conn, params=(condition_message, limit))
+            df = pd.read_sql(query, conn, params=(condition_mnemonic, limit))
 
         return df.sort_values('snapshot_date')  # Ascending for plotting
 
@@ -129,7 +129,7 @@ class TrendSnapshotManager:
         """
         query = """
                 SELECT snapshot_date, \
-                       condition_message, \
+                       condition_mnemonic, \
                        recent_daily_avg, \
                        change_percent, \
                        confidence_score, \
@@ -147,7 +147,7 @@ class TrendSnapshotManager:
 
         # Pivot for easy comparison
         comparison = df.pivot_table(
-            index='condition_message',
+            index='condition_mnemonic',
             columns='snapshot_date',
             values=['recent_daily_avg', 'rank_position'],
             aggfunc='first'
@@ -167,24 +167,24 @@ class TrendSnapshotManager:
             DataFrame of stabilizing faults
         """
         query = """
-                WITH recent_trends AS (SELECT condition_message, \
+                WITH recent_trends AS (SELECT condition_mnemonic, \
                                               snapshot_date, \
                                               recent_daily_avg, \
-                                              ROW_NUMBER() OVER (PARTITION BY condition_message ORDER BY snapshot_date DESC) as rn \
+                                              ROW_NUMBER() OVER (PARTITION BY condition_mnemonic ORDER BY snapshot_date DESC) as rn \
                                        FROM fault_trend_snapshots \
                                        WHERE snapshot_date >= DATE_SUB(CURDATE(), INTERVAL %s WEEK) \
                                          AND days_recent = 7 \
                                          AND days_previous = 30),
-                     first_last AS (SELECT condition_message, \
+                     first_last AS (SELECT condition_mnemonic, \
                                            MAX(CASE WHEN rn = 1 THEN recent_daily_avg END) as latest_avg, \
                                            MAX(CASE \
                                                    WHEN rn = (SELECT MAX(rn) \
                                                               FROM recent_trends rt2 \
-                                                              WHERE rt2.condition_message = recent_trends.condition_message) \
+                                                              WHERE rt2.condition_mnemonic = recent_trends.condition_mnemonic) \
                                                        THEN recent_daily_avg END)          as earliest_avg \
                                     FROM recent_trends \
-                                    GROUP BY condition_message)
-                SELECT condition_message, \
+                                    GROUP BY condition_mnemonic)
+                SELECT condition_mnemonic, \
                        earliest_avg, \
                        latest_avg, \
                        ROUND(((latest_avg - earliest_avg) / earliest_avg) * 100, 1) as trend_change_percent
