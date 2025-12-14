@@ -19,6 +19,7 @@ class InterlockPredictor:
         self.label_encoder = LabelEncoder()
         self.scaler = StandardScaler()
         self.model = None
+        self.mnemonic_to_message: dict[str, str] = {}
 
     def build_model(self, input_size: int, num_classes: int):
         self.model = nn.Sequential(
@@ -36,7 +37,7 @@ class InterlockPredictor:
             nn.Linear(64, num_classes)
         ).to(self.device)
 
-    def train(self, df: pd.DataFrame, target: str = 'Condition_Message',
+    def train(self, df: pd.DataFrame, target: str = 'Condition_Mnemonic',
               epochs: int = 200, min_samples: int = 5):
         """
         Train to predict faults.
@@ -46,6 +47,37 @@ class InterlockPredictor:
             epochs: Training iterations
             min_samples: Only include faults with at least this many occurrences
         """
+        df = df.copy()
+
+        if "Condition_Mnemonic" not in df.columns:
+            raise KeyError("Expected column 'Condition_Mnemonic' in dataframe")
+
+        # Clean mnemonic (this is what you TRAIN on)
+        df["Condition_Mnemonic"] = (
+            df["Condition_Mnemonic"]
+            .astype(str)
+            .str.strip()
+            .replace({"": pd.NA, "None": pd.NA, "nan": pd.NA})
+        )
+        df = df[df["Condition_Mnemonic"].notna()].copy()
+
+        # Build mnemonic -> message mapping for DISPLAY ONLY
+        self.mnemonic_to_message = {}
+        if "Condition_Message" in df.columns:
+            msg = (
+                df["Condition_Message"]
+                .astype(str)
+                .str.strip()
+                .replace({"": pd.NA, "None": pd.NA, "nan": pd.NA})
+            )
+            tmp = pd.DataFrame({"mn": df["Condition_Mnemonic"], "msg": msg}).dropna(subset=["mn", "msg"])
+            if not tmp.empty:
+                self.mnemonic_to_message = (
+                    tmp.groupby("mn")["msg"]
+                    .agg(lambda s: s.value_counts().index[0])  # most common message per mnemonic
+                    .to_dict()
+                )
+
         # Filter rare faults (hard to learn from 1-2 examples)
         fault_counts = df[target].value_counts()
         common_faults = fault_counts[fault_counts >= min_samples].index
@@ -89,32 +121,6 @@ class InterlockPredictor:
 
         print(f"\nBest accuracy: {best_accuracy:.2%}")
 
-    def predict_next_fault(self, hour: int, day_of_week: int, level: int,
-                           plc_encoded: int, type_encoded: int,
-                           direction_encoded: int, bit_index: int,
-                           top_k: int = 5) -> pd.DataFrame:
-        """Predict most likely next faults with probabilities."""
-        self.model.eval()
-
-        features = np.array([[hour, day_of_week, level, plc_encoded,
-                              type_encoded, direction_encoded, bit_index]])
-        features = self.scaler.transform(features)
-
-        with torch.no_grad():
-            X_t = torch.FloatTensor(features).to(self.device)
-            outputs = torch.softmax(self.model(X_t), dim=1)
-            probs, indices = torch.topk(outputs, top_k)
-
-        predictions = []
-        for prob, idx in zip(probs[0], indices[0]):
-            fault_name = self.label_encoder.inverse_transform([idx.item()])[0]
-            predictions.append({
-                'Condition': fault_name,
-                'Probability': f"{prob.item():.1%}"
-            })
-
-        return pd.DataFrame(predictions)
-
     def predict_from_current_state(self, df: pd.DataFrame, top_k: int = 5) -> pd.DataFrame:
         """Predict next likely faults based on the most recent data."""
         latest = df.iloc[-1]
@@ -130,12 +136,43 @@ class InterlockPredictor:
             top_k=top_k
         )
 
+    def predict_next_fault(self, hour: int, day_of_week: int, level: int,
+                           plc_encoded: int, type_encoded: int,
+                           direction_encoded: int, bit_index: int,
+                           top_k: int = 5) -> pd.DataFrame:
+        """Predict most likely next faults with probabilities."""
+        if self.model is None:
+            raise RuntimeError("Model is not built. Call train() or load_model() first.")
+
+        self.model.eval()
+
+        features = np.array([[hour, day_of_week, level, plc_encoded,
+                              type_encoded, direction_encoded, bit_index]])
+        features = self.scaler.transform(features)
+
+        with torch.no_grad():
+            X_t = torch.FloatTensor(features).to(self.device)
+            outputs = torch.softmax(self.model(X_t), dim=1)
+            probs, indices = torch.topk(outputs, top_k)
+
+        predictions = []
+        for prob, idx in zip(probs[0], indices[0]):
+            mnemonic = self.label_encoder.inverse_transform([idx.item()])[0]
+            predictions.append({
+                "Condition_Mnemonic": mnemonic,
+                "Condition_Message": self.mnemonic_to_message.get(mnemonic),  # display only
+                "Probability": f"{prob.item():.1%}",
+            })
+
+        return pd.DataFrame(predictions)
+
     def save_model(self, path: str = 'interlock_model.pth'):
         """Save trained model to file."""
         torch.save({
             'model_state': self.model.state_dict(),
             'scaler': self.scaler,
-            'label_encoder': self.label_encoder
+            'label_encoder': self.label_encoder,
+            'mnemonic_to_message': self.mnemonic_to_message,  # keep display mapping
         }, path)
         print(f"Model saved to {path}")
 
@@ -144,6 +181,7 @@ class InterlockPredictor:
         checkpoint = torch.load(path, map_location=self.device)
         self.scaler = checkpoint['scaler']
         self.label_encoder = checkpoint['label_encoder']
+        self.mnemonic_to_message = checkpoint.get('mnemonic_to_message', {})
 
         num_classes = len(self.label_encoder.classes_)
         self.build_model(input_size, num_classes)
@@ -163,7 +201,7 @@ class InterlockPredictor:
                         'TYPE_encoded', 'Direction_encoded', 'BIT_INDEX']
 
         # Filter to known classes only
-        known_mask = df['Condition_Message'].isin(self.label_encoder.classes_)
+        known_mask = df['Condition_Mnemonic'].isin(self.label_encoder.classes_)
         df_valid = df[known_mask].copy()
 
         # Fixed seed for reproducible sampling
@@ -183,7 +221,7 @@ class InterlockPredictor:
             top5_faults = [self.label_encoder.inverse_transform([idx.item()])[0] for idx in all_indices[i]]
             top5_probs = [f"{p.item():.1%}" for p in all_probs[i]]
 
-            actual = row['Condition_Message']
+            actual = row['Condition_Mnemonic']
             predicted = top5_faults[0]
             in_top5 = actual in top5_faults
 
@@ -214,8 +252,9 @@ class PatternAnalyzer:
     def __init__(self, df: pd.DataFrame, root_cause_only: bool = True):
         self.df = df.copy()
         self.df['TIMESTAMP'] = pd.to_datetime(self.df['TIMESTAMP'])
-        # Use Interlock_Message as fallback when Condition_Message is null
-        self.df['Condition_Message'] = self.df['Condition_Message'].fillna(self.df['Interlock_Message'])
+
+        # Use Interlock_Message as fallback when Condition_Mnemonic is null
+        self.df['Condition_Mnemonic'] = self.df['Condition_Mnemonic'].fillna(self.df['Interlock_Message'])
 
         if root_cause_only:
             # Keep only the deepest level (root cause) per interlock chain
@@ -224,9 +263,41 @@ class PatternAnalyzer:
             ]
 
     def most_frequent_faults(self, top_n: int = 10) -> pd.DataFrame:
-        """Get most frequently occurring interlocks."""
-        counts = self.df['Condition_Message'].value_counts().head(top_n)
-        return pd.DataFrame({'Condition': counts.index, 'Count': counts.values})
+        """Get most frequently occurring faults (count by mnemonic, show message as info)."""
+        counts = self.df['Condition_Mnemonic'].value_counts().head(top_n)
+
+        result = pd.DataFrame({
+            "Mnemonic": counts.index,
+            "Count": counts.values,
+        })
+
+        if "Condition_Message" in self.df.columns:
+            msg = (
+                self.df[["Condition_Mnemonic", "Condition_Message"]]
+                .dropna(subset=["Condition_Mnemonic", "Condition_Message"])
+                .copy()
+            )
+            msg["Condition_Message"] = (
+                msg["Condition_Message"]
+                .astype(str)
+                .str.strip()
+                .replace({"": pd.NA, "None": pd.NA, "nan": pd.NA})
+            )
+            msg = msg.dropna(subset=["Condition_Message"])
+
+            if not msg.empty:
+                mnemonic_to_message = (
+                    msg.groupby("Condition_Mnemonic")["Condition_Message"]
+                       .agg(lambda s: s.value_counts().index[0])
+                       .to_dict()
+                )
+                result["Info_Message"] = result["Mnemonic"].map(mnemonic_to_message)
+            else:
+                result["Info_Message"] = pd.NA
+        else:
+            result["Info_Message"] = pd.NA
+
+        return result[["Mnemonic", "Info_Message", "Count"]]
 
     def faults_by_plc(self) -> pd.DataFrame:
         """Count faults per PLC."""
@@ -249,11 +320,11 @@ class PatternAnalyzer:
             nearby = self.df[
                 (self.df['TIMESTAMP'] >= window_start) &
                 (self.df['TIMESTAMP'] <= window_end) &
-                (self.df['Condition_Message'] != row['Condition_Message'])
-                ]['Condition_Message'].tolist()
+                (self.df['Condition_Mnemonic'] != row['Condition_Mnemonic'])
+                ]['Condition_Mnemonic'].tolist()
 
             for other in nearby:
-                pair = tuple(sorted([row['Condition_Message'], other]))
+                pair = tuple(sorted([row['Condition_Mnemonic'], other]))
                 correlations.append(pair)
 
         return Counter(correlations).most_common(10)
@@ -273,46 +344,57 @@ class PatternAnalyzer:
             'Threshold': anomaly_threshold
         })
 
+    def _mnemonic_to_info_map(self) -> dict:
+        """Build mnemonic -> representative info text (message) mapping for display only."""
+        info_col = None
+        if "Condition_Message" in self.df.columns and self.df["Condition_Message"].notna().any():
+            info_col = "Condition_Message"
+        elif "Interlock_Message" in self.df.columns and self.df["Interlock_Message"].notna().any():
+            info_col = "Interlock_Message"
+
+        if info_col is None:
+            return {}
+
+        tmp = self.df[["Condition_Mnemonic", info_col]].dropna(subset=["Condition_Mnemonic", info_col]).copy()
+        tmp[info_col] = (
+            tmp[info_col]
+            .astype(str)
+            .str.strip()
+            .replace({"": pd.NA, "None": pd.NA, "nan": pd.NA})
+        )
+        tmp = tmp.dropna(subset=[info_col])
+        if tmp.empty:
+            return {}
+
+        return (
+            tmp.groupby("Condition_Mnemonic")[info_col]
+               .agg(lambda s: s.value_counts().index[0])
+               .to_dict()
+        )
+
     def top_risers(self, days_recent: int = 7, days_previous: int = 30,
                    top_n: int = 10, min_recent_count: int = 3,
                    reference_date: pd.Timestamp | None = None) -> pd.DataFrame:
         """
         Find faults that are increasing in frequency with statistical rigor.
-
-        Improvements:
-        - Filters out statistically insignificant changes
-        - Uses confidence scoring to prioritize meaningful increases
-        - Supports fixed reference dates for reproducibility
-        - Considers both percentage change AND absolute volume
-
-        Args:
-            days_recent: Number of recent days to analyze
-            days_previous: Number of previous days to compare against
-            top_n: Number of top risers to return
-            min_recent_count: Minimum occurrences in recent period (filters noise)
-            reference_date: Fixed date to use as "now" (None = use latest data)
         """
-        # Use fixed reference date for reproducibility
+        # ... existing code ...
         now = reference_date if reference_date else self.df['TIMESTAMP'].max()
         recent_start = now - pd.Timedelta(days=days_recent)
         previous_start = now - pd.Timedelta(days=days_recent + days_previous)
 
-        # Split data into periods
         recent = self.df[self.df['TIMESTAMP'] >= recent_start]
         previous = self.df[
             (self.df['TIMESTAMP'] >= previous_start) &
             (self.df['TIMESTAMP'] < recent_start)
-            ]
+        ]
 
-        # Count faults per period
-        recent_counts = recent['Condition_Message'].value_counts()
-        previous_counts = previous['Condition_Message'].value_counts()
+        recent_counts = recent['Condition_Mnemonic'].value_counts()
+        previous_counts = previous['Condition_Mnemonic'].value_counts()
 
-        # Normalize by number of days
         recent_daily = recent_counts / days_recent
         previous_daily = previous_counts / days_previous
 
-        # Only analyze faults with minimum recent activity
         significant_faults = recent_counts[recent_counts >= min_recent_count].index
 
         risers = []
@@ -322,28 +404,22 @@ class PatternAnalyzer:
             recent_count = recent_counts.get(fault, 0)
             previous_count = previous_counts.get(fault, 0)
 
-            # Calculate percentage change
             if previous_rate > 0:
                 change_pct = ((recent_rate - previous_rate) / previous_rate) * 100
             elif recent_rate > 0:
-                change_pct = float('inf')  # New fault
+                change_pct = float('inf')
             else:
                 continue
 
-            # Calculate absolute change (occurrences per day)
             absolute_change = recent_rate - previous_rate
 
-            # Confidence score: combines % change with absolute volume
-            # Higher recent counts = more confident the trend is real
             if change_pct == float('inf'):
-                confidence_score = recent_count * 1000  # Heavily weight new faults
+                confidence_score = recent_count * 1000
             else:
-                # Score = % change weighted by sqrt of recent count
-                # sqrt dampens the effect so 100 occurrences isn't 100x more important than 1
                 confidence_score = change_pct * np.sqrt(recent_count)
 
             risers.append({
-                'Condition': fault,
+                'Condition': fault,  # this is the mnemonic (kept for compatibility)
                 'Recent_Daily_Avg': round(recent_rate, 2),
                 'Previous_Daily_Avg': round(previous_rate, 2),
                 'Change_%': round(change_pct, 1) if change_pct != float('inf') else 'NEW',
@@ -354,15 +430,15 @@ class PatternAnalyzer:
             })
 
         risers_df = pd.DataFrame(risers)
-
         if risers_df.empty:
             return risers_df
 
-        # Sort by confidence score (captures both % change and volume)
         risers_df = risers_df.sort_values('Confidence_Score', ascending=False)
-
-        # Add rank column for clarity
         risers_df.insert(0, 'Rank', range(1, len(risers_df) + 1))
+
+        # DISPLAY ONLY: attach an info message column
+        info_map = self._mnemonic_to_info_map()
+        risers_df.insert(2, "Info_Message", risers_df["Condition"].map(info_map))
 
         return risers_df.head(top_n)
 
@@ -399,8 +475,8 @@ class PatternAnalyzer:
         period1_days = (period1_end - period1_start).days + 1
         period2_days = (period2_end - period2_start).days + 1
 
-        p1_counts = period1['Condition_Message'].value_counts()
-        p2_counts = period2['Condition_Message'].value_counts()
+        p1_counts = period1['Condition_Mnemonic'].value_counts()
+        p2_counts = period2['Condition_Mnemonic'].value_counts()
 
         p1_daily = p1_counts / period1_days
         p2_daily = p2_counts / period2_days
@@ -477,7 +553,7 @@ class PatternAnalyzer:
             },
             'total_faults_recent': len(recent),
             'total_faults_previous': len(previous),
-            'unique_faults_recent': recent['Condition_Message'].nunique(),
-            'unique_faults_previous': previous['Condition_Message'].nunique(),
+            'unique_faults_recent': recent['Condition_Mnemonic'].nunique(),
+            'unique_faults_previous': previous['Condition_Mnemonic'].nunique(),
             'data_quality_warnings': warnings if warnings else ['No issues detected']
         }
