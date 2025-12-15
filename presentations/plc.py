@@ -131,13 +131,12 @@ def table_tree():
     # GET: read parameters
     target_bsid = request.args.get("target_bsid", type=int)
     top_n = request.args.get("top_n", type=int)
-    filter_date = request.args.get("filter_date")
     filter_timestamp_start = request.args.get("filter_timestamp_start")
     filter_timestamp_end = request.args.get("filter_timestamp_end")
     filter_condition_message = request.args.get("filter_condition_message")
     filter_plc = request.args.get("filter_plc")
 
-    if target_bsid is None and top_n is None and filter_date is None and filter_timestamp_start is None and filter_timestamp_end is None and filter_condition_message is None and filter_plc is None:
+    if target_bsid is None and top_n is None  and filter_timestamp_start is None and filter_timestamp_end is None and filter_condition_message is None and filter_plc is None:
         items= []
     else:
         items = service_interlock.analyze_interlock(
