@@ -82,7 +82,7 @@ def test_direct_sql_query():
             PLC,
             BSID,
             Condition_Message
-        FROM dbo.fn_InterlockChain(NULL, 5, NULL, NULL, NULL, NULL, NULL)
+        FROM dbo.fn_InterlockChain(NULL, 5, NULL, NULL, NULL, NULL)
         ORDER BY TIMESTAMP DESC, Date DESC, Level
         """
 
@@ -107,7 +107,7 @@ def test_direct_sql_query():
             PLC,
             BSID,
             Condition_Message
-        FROM dbo.fn_InterlockChain(NULL, 5, NULL, NULL, NULL, 'test', NULL)
+        FROM dbo.fn_InterlockChain(NULL, 5, NULL, NULL, 'test', NULL)
         ORDER BY TIMESTAMP DESC, Date DESC, Level
         """
 
@@ -209,7 +209,6 @@ def test_sqlalchemy_query(engine):
         FROM dbo.fn_InterlockChain(
             :target_bsid, 
             :top_n, 
-            :filter_date, 
             :filter_timestamp_start, 
             :filter_timestamp_end, 
             :filter_condition_message, 
@@ -221,7 +220,6 @@ def test_sqlalchemy_query(engine):
         params = {
             'target_bsid': None,
             'top_n': 5,
-            'filter_date': None,
             'filter_timestamp_start': None,
             'filter_timestamp_end': None,
             'filter_condition_message': 'test',
@@ -291,7 +289,7 @@ def test_pandas_read_sql(engine):
             PLC,
             BSID,
             Condition_Message
-        FROM dbo.fn_InterlockChain(NULL, 5, NULL, NULL, NULL, 'test', NULL)
+        FROM dbo.fn_InterlockChain(NULL, 5, NULL, NULL, 'test', NULL)
         ORDER BY TIMESTAMP DESC, Date DESC, Level
         """
 

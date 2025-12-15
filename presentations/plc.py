@@ -147,7 +147,6 @@ def table_tree():
         items = service_interlock.analyze_interlock(
             target_bsid=target_bsid,
             top_n=top_n,
-            filter_date=filter_date,
             filter_timestamp_start=filter_timestamp_start,
             filter_timestamp_end=filter_timestamp_end,
             filter_condition_message=filter_condition_message,
@@ -165,7 +164,6 @@ def table_tree():
         messages=messages,
         target_bsid=target_bsid,
         top_n=top_n,
-        filter_date=filter_date,
         filter_timestamp_start=filter_timestamp_start,
         filter_timestamp_end=filter_timestamp_end,
         filter_condition_message=filter_condition_message,
