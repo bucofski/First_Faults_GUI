@@ -4,11 +4,10 @@ IF OBJECT_ID('dbo.fn_InterlockChain', 'TF') IS NOT NULL
 GO
 
 CREATE FUNCTION dbo.fn_InterlockChain (
-    @TargetBSID INT = NULL,  -- Optional: If NULL, returns last 10 interlocks with their full trees
-    @TopN INT = NULL,  -- If NULL, defaults to 10
-    @FilterDate DATE = NULL,  -- Optional: Filter by specific date
-    @FilterTimestampStart DATETIME = NULL,  -- Optional: Filter by timestamp range start
-    @FilterTimestampEnd DATETIME = NULL,  -- Optional: Filter by timestamp range end
+    @TargetBSID INT = NULL,  -- Optional: If NULL, returns last N interlocks with their full trees
+    @TopN INT = NULL,  -- If NULL, defaults to 100
+    @FilterTimestampStart DATETIME = NULL,  -- Optional: Filter by timestamp range start (can be date or datetime)
+    @FilterTimestampEnd DATETIME = NULL,  -- Optional: Filter by timestamp range end (can be date or datetime)
     @FilterConditionMessage NVARCHAR(255) = NULL,  -- Optional: Search text in condition message or mnemonic
     @FilterPLC NVARCHAR(50) = NULL  -- Optional: Filter by PLC name
 )
@@ -18,7 +17,6 @@ RETURN
 (
     WITH AnchorInterlock AS (
         -- Get DISTINCT anchor interlocks (TOP N based on parameter) with optional filters
-        -- CRITICAL FIX: Include ORDER BY columns in SELECT to work with DISTINCT
         SELECT DISTINCT TOP (ISNULL(@TopN, 100))
             il.ID as AnchorID,
             il.TIMESTAMP as AnchorTimestamp,
@@ -30,12 +28,27 @@ RETURN
         INNER JOIN First_Fault.dbo.PLC p
             ON idef.PLC_ID = p.PLC_ID
         WHERE (@TargetBSID IS NULL OR idef.NUMBER = @TargetBSID)
-            -- Apply optional filters
-            AND (@FilterDate IS NULL OR CAST(il.TIMESTAMP AS DATE) = @FilterDate)
-            AND (@FilterTimestampStart IS NULL OR il.TIMESTAMP >= @FilterTimestampStart)
-            AND (@FilterTimestampEnd IS NULL OR il.TIMESTAMP <= @FilterTimestampEnd)
+            -- Apply timestamp range filters with intelligent handling
+            AND (
+                @FilterTimestampStart IS NULL
+                OR il.TIMESTAMP >= CASE
+                    -- If time component is midnight (00:00:00.000), treat as start of day
+                    WHEN CAST(@FilterTimestampStart AS TIME) = '00:00:00.000'
+                    THEN CAST(CAST(@FilterTimestampStart AS DATE) AS DATETIME)
+                    ELSE @FilterTimestampStart
+                END
+            )
+            AND (
+                @FilterTimestampEnd IS NULL
+                OR il.TIMESTAMP <= CASE
+                    -- If time component is midnight (00:00:00.000), treat as end of that day
+                    WHEN CAST(@FilterTimestampEnd AS TIME) = '00:00:00.000'
+                    THEN DATEADD(SECOND, -1, DATEADD(DAY, 1, CAST(CAST(@FilterTimestampEnd AS DATE) AS DATETIME)))
+                    ELSE @FilterTimestampEnd
+                END
+            )
             AND (@FilterPLC IS NULL OR p.PLC_NAME = @FilterPLC)
-            -- Condition message filter applied separately below
+            -- Condition message filter
             AND (@FilterConditionMessage IS NULL
                 OR EXISTS (
                     SELECT 1
@@ -53,7 +66,7 @@ RETURN
     UpstreamChain AS (
         -- Anchor: Start with selected interlocks
         SELECT
-            il.ID as AnchorReference,  -- Track which anchor this belongs to
+            il.ID as AnchorReference,
             0 as Level,
             il.ID,
             il.TIMESTAMP,
@@ -75,9 +88,9 @@ RETURN
 
         UNION ALL
 
-        -- Recursive: Follow upstream references for each anchor
+        -- Recursive: Follow upstream references
         SELECT
-            uc.AnchorReference,  -- Carry forward the anchor reference
+            uc.AnchorReference,
             uc.Level + 1,
             upstream_il.ID,
             upstream_il.TIMESTAMP,
@@ -102,7 +115,7 @@ RETURN
     DownstreamChain AS (
         -- Start from anchor points
         SELECT
-            il.ID as AnchorReference,  -- Track which anchor this belongs to
+            il.ID as AnchorReference,
             0 as Level,
             il.ID,
             il.TIMESTAMP,
@@ -124,9 +137,9 @@ RETURN
 
         UNION ALL
 
-        -- Recursive: Follow downstream references for each anchor
+        -- Recursive: Follow downstream references
         SELECT
-            dc.AnchorReference,  -- Carry forward the anchor reference
+            dc.AnchorReference,
             dc.Level - 1,
             downstream_il.ID,
             downstream_il.TIMESTAMP,
@@ -188,34 +201,27 @@ RETURN
     LEFT JOIN First_Fault.dbo.TEXT_DEFINITION td_condition
         ON cdef.TEXT_DEF_ID = td_condition.TEXT_DEF_ID
 );
-GO
-
--- Index remains the same
-CREATE NONCLUSTERED INDEX IX_FF_INTERLOCK_LOG_UpstreamRef
-ON First_Fault.dbo.FF_INTERLOCK_LOG (UPSTREAM_INTERLOCK_LOG_ID, TIMESTAMP)
-INCLUDE (ID, INTERLOCK_DEF_ID, ORDER_LOG);
-GO
 
 /*
 USAGE EXAMPLES:
 
 -- Get last 10 interlocks (any BSID) with their FULL TREES (NULL defaults to 10):
-SELECT * FROM dbo.fn_InterlockChain(NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+SELECT * FROM dbo.fn_InterlockChain( NULL, NULL, NULL, NULL, NULL, NULL)
 ORDER BY TIMESTAMP DESC, Date DESC, Level;
 
 -- Get specific BSID with its tree (NULL defaults to 10):
-SELECT * FROM dbo.fn_InterlockChain(12345, NULL, NULL, NULL, NULL, NULL, NULL)
+SELECT * FROM dbo.fn_InterlockChain(12345,  NULL, NULL, NULL, NULL, NULL)
 ORDER BY TIMESTAMP DESC, Date DESC, Level;
 
 -- Get top 5 of specific BSID with trees:
-SELECT * FROM dbo.fn_InterlockChain(12345, 5, NULL, NULL, NULL, NULL, NULL)
+SELECT * FROM dbo.fn_InterlockChain(12345, 5,  NULL, NULL, NULL, NULL)
 ORDER BY TIMESTAMP DESC, Date DESC, Level;
 
 -- Filter by date and get trees (NULL defaults to 10):
-SELECT * FROM dbo.fn_InterlockChain(NULL, NULL, '2024-12-05', NULL, NULL, NULL, NULL)
+SELECT * FROM dbo.fn_InterlockChain(NULL,  '2024-12-05', NULL, NULL, NULL, NULL)
 ORDER BY TIMESTAMP DESC, Date DESC, Level;
 
 -- Filter by PLC and condition message:
-SELECT * FROM dbo.fn_InterlockChain(NULL, NULL, NULL, NULL, NULL, 'Emergency', 'PLC_001')
+SELECT * FROM dbo.fn_InterlockChain( NULL, NULL, NULL, NULL, 'Emergency', 'PLC_001')
 ORDER BY TIMESTAMP DESC, Date DESC, Level;
 */

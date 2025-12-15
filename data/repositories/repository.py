@@ -19,7 +19,6 @@ class InterlockRepository:
         self,
         target_bsid: int | None = None,
         top_n: int | None = None,
-        filter_date: datetime | None = None,
         filter_timestamp_start: datetime | None = None,
         filter_timestamp_end: datetime | None = None,
         filter_condition_message: str | None = None,
@@ -31,7 +30,6 @@ class InterlockRepository:
         Args:
             target_bsid: Optional BSID to filter by
             top_n: Number of top interlocks to retrieve
-            filter_date: Filter by specific date
             filter_timestamp_start: Filter by timestamp range start
             filter_timestamp_end: Filter by timestamp range end
             filter_condition_message: Search text in condition message or mnemonic
@@ -61,7 +59,6 @@ class InterlockRepository:
         FROM dbo.fn_InterlockChain(
             :target_bsid, 
             :top_n, 
-            :filter_date, 
             :filter_timestamp_start, 
             :filter_timestamp_end, 
             :filter_condition_message, 
@@ -74,7 +71,6 @@ class InterlockRepository:
         params = {
             'target_bsid': target_bsid,
             'top_n': top_n,
-            'filter_date': filter_date,
             'filter_timestamp_start': filter_timestamp_start,
             'filter_timestamp_end': filter_timestamp_end,
             'filter_condition_message': filter_condition_message,

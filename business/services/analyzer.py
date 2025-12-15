@@ -1,6 +1,5 @@
 """Main analyzer orchestrating the interlock analysis workflow."""
-
-from typing import Any
+from datetime import datetime
 
 from business.core.formatters import ResultFormatter, DictionaryResultFormatter
 from business.core.tree_builder import InterlockTreeBuilder
@@ -26,10 +25,8 @@ class InterlockAnalyzer:
             self,
             target_bsid: int | None = None,
             top_n: int | None = None,
-            filter_date=None,
-            filter_timestamp_start=None,
-            filter_timestamp_end=None,
-            filter_mnemonic: str | None = None,
+            filter_timestamp_start: datetime | None = None,
+            filter_timestamp_end: datetime | None = None,
             filter_condition_message: str | None = None,
             filter_plc: str | None = None,
             formatter: ResultFormatter | None = None
@@ -41,7 +38,6 @@ class InterlockAnalyzer:
         df = self.repository.get_interlock_chain(
             target_bsid=target_bsid,
             top_n=top_n,
-            filter_date=filter_date,
             filter_timestamp_start=filter_timestamp_start,
             filter_timestamp_end=filter_timestamp_end,
             filter_condition_message=filter_condition_message,

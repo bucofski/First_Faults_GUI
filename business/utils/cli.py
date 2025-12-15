@@ -10,7 +10,6 @@ from business.core.formatters import DictionaryResultFormatter, ConsoleResultFor
 def main(
     target_bsid: int | None = None,
     top_n: int | None = None,
-    filter_date: datetime | None = None,
     filter_timestamp_start: datetime | None = None,
     filter_timestamp_end: datetime | None = None,
     filter_condition_message: str | None = None,
@@ -29,7 +28,6 @@ def main(
         df = analyzer.repository.get_interlock_chain(
             target_bsid=target_bsid,
             top_n=top_n,
-            filter_date=filter_date,
             filter_timestamp_start=filter_timestamp_start,
             filter_timestamp_end=filter_timestamp_end,
             filter_condition_message=filter_condition_message,
@@ -43,7 +41,6 @@ def main(
         trees = analyzer.analyze_interlock(
             target_bsid=target_bsid,
             top_n=top_n,
-            filter_date=filter_date,
             filter_timestamp_start=filter_timestamp_start,
             filter_timestamp_end=filter_timestamp_end,
             filter_condition_message=filter_condition_message,
