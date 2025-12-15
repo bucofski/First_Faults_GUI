@@ -51,7 +51,6 @@ def table_tree_export():
     # Read same fields as table_tree
     target_bsid_str = request.form.get("target_bsid", "").strip()
     top_n_str = request.form.get("top_n", "").strip()
-    filter_date = request.form.get("filter_date", "").strip() or None
     filter_timestamp_start = request.form.get("filter_timestamp_start", "").strip() or None
     filter_timestamp_end = request.form.get("filter_timestamp_end", "").strip() or None
     filter_condition_message = request.form.get("filter_condition_message", "").strip() or None
@@ -78,7 +77,6 @@ def table_tree_export():
     items = service_interlock.analyze_interlock(
         target_bsid=target_bsid,
         top_n=top_n,
-        filter_date=filter_date,
         filter_timestamp_start=filter_timestamp_start,
         filter_timestamp_end=filter_timestamp_end,
         filter_condition_message=filter_condition_message,
@@ -99,7 +97,6 @@ def table_tree():
     if request.method == "POST":
         target_bsid_str = request.form.get("target_bsid", "").strip()
         top_n_str = request.form.get("top_n", "").strip()
-        filter_date = request.form.get("filter_date", "").strip() or None
         filter_timestamp_start = request.form.get("filter_timestamp_start", "").strip() or None
         filter_timestamp_end = request.form.get("filter_timestamp_end", "").strip() or None
         filter_condition_message = request.form.get("filter_condition_message", "").strip() or None
@@ -119,8 +116,7 @@ def table_tree():
             except ValueError:
                 flash("Top must be a valid integer.", "error")
 
-        if filter_date:
-            params["filter_date"] = filter_date
+
         if filter_timestamp_start:
             params["filter_timestamp_start"] = filter_timestamp_start
         if filter_timestamp_end:
