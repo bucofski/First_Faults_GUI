@@ -94,7 +94,7 @@ class InterlockTreeBuilder:
             if pd.notna(row.get("Condition_Message")):
                 conditions.append(InterlockCondition(
                     type=row["TYPE"],
-                    bit_index=row["BIT_INDEX"],
+                    bit_index=int(row["BIT_INDEX"]),  # ← Force conversion to int!
                     message=row["Condition_Message"]
                 ))
         return conditions
