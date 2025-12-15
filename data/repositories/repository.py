@@ -3,17 +3,19 @@
 from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import func, select
 
-from data.repositories.DB_Connection import get_engine
+from data.repositories.DB_Connection import get_session
 
 
 class InterlockRepository:
-    """Repository for interlock data access using direct pandas SQL."""
+    """Repository for interlock data access using session context manager."""
 
-    def __init__(self):
-        """Initialize repository with database engine."""
-        self.engine = get_engine()
+    TVF_COLUMNS = (
+        "Date", "TIMESTAMP", "Level", "Interlock_Log_ID", "BSID",
+        "PLC", "Direction", "Interlock_Message", "Status",
+        "TYPE", "BIT_INDEX", "Condition_Message"
+    )
 
     def get_interlock_chain(
         self,
@@ -22,88 +24,53 @@ class InterlockRepository:
         filter_timestamp_start: datetime | None = None,
         filter_timestamp_end: datetime | None = None,
         filter_condition_message: str | None = None,
-        filter_plc: str | None = None,
+        filter_plc: str | None = None
     ) -> pd.DataFrame:
         """
         Retrieve interlock chain data with upstream/downstream tracing.
 
         Args:
-            target_bsid: Optional BSID to filter by
-            top_n: Number of top interlocks to retrieve
-            filter_timestamp_start: Filter by timestamp range start
-            filter_timestamp_end: Filter by timestamp range end
-            filter_condition_message: Search text in condition message or mnemonic
-            filter_plc: Filter by PLC name
+            target_bsid: Optional BSID. If NULL, returns last interlocks with their full trees
+            top_n: Number of results to return (default in SQL: 10). If None, uses SQL default
+            filter_timestamp_start: Optional filter by timestamp range start
+            filter_timestamp_end: Optional filter by timestamp range end
+            filter_condition_message: Optional search text in condition message
+            filter_plc: Optional filter by PLC name
 
         Returns:
             DataFrame with interlock chain data
         """
-        # Build SQL query
-        query = """
-        SELECT 
-            AnchorReference,
-            Date,
-            Level,
-            Direction,
-            Interlock_Log_ID,
-            TIMESTAMP,
-            PLC,
-            BSID,
-            Interlock_Message,
-            TYPE,
-            BIT_INDEX,
-            Condition_Mnemonic,
-            Condition_Message,
-            UPSTREAM_INTERLOCK_REF,
-            Status
-        FROM dbo.fn_InterlockChain(
-            :target_bsid, 
-            :top_n, 
-            :filter_timestamp_start, 
-            :filter_timestamp_end, 
-            :filter_condition_message, 
-            :filter_plc
-        )
-        ORDER BY TIMESTAMP DESC, Date DESC, Level
-        """
+        interlock_func = func.dbo.fn_InterlockChain(
+            target_bsid,
+            top_n,
+            filter_timestamp_start,
+            filter_timestamp_end,
+            filter_condition_message,
+            filter_plc
+        ).table_valued(*self.TVF_COLUMNS)
 
-        # Prepare parameters
-        params = {
-            'target_bsid': target_bsid,
-            'top_n': top_n,
-            'filter_timestamp_start': filter_timestamp_start,
-            'filter_timestamp_end': filter_timestamp_end,
-            'filter_condition_message': filter_condition_message,
-            'filter_plc': filter_plc,
-        }
-
-        try:
-            # Use pandas read_sql with timeout
-            df = pd.read_sql(
-                sql=text(query),
-                con=self.engine,
-                params=params
+        stmt = (
+            select(interlock_func)
+            .order_by(
+                interlock_func.c.TIMESTAMP.desc(),
+                interlock_func.c.Date.desc(),
+                interlock_func.c.Level
             )
-            return df
+            .suffix_with("OPTION (RECOMPILE)")
+        )
 
-        except Exception as e:
-            print(f"❌ Query failed: {e}")
-            # Return empty DataFrame with expected columns
-            return pd.DataFrame(columns=[
-                "AnchorReference", "Date", "Level", "Direction", "Interlock_Log_ID",
-                "TIMESTAMP", "PLC", "BSID", "Interlock_Message",
-                "TYPE", "BIT_INDEX", "Condition_Mnemonic", "Condition_Message",
-                "UPSTREAM_INTERLOCK_REF", "Status"
-            ])
+        with get_session() as session:
+            result = session.execute(stmt)
+            return pd.DataFrame(result.fetchall(), columns=result.keys())
 
     def test_connection(self) -> bool:
         """Test database connection."""
         try:
-            query = "SELECT DB_NAME() as CurrentDatabase"
-            df = pd.read_sql(query, self.engine)
-            db_name = df.iloc[0]['CurrentDatabase']
-            print(f"✓ Connection successful! Database: {db_name}")
-            return True
+            with get_session() as session:
+                result = session.execute(select(func.db_name().label("CurrentDatabase")))
+                row = result.fetchone()
+                print(f"✓ Connection successful! Database: {row.CurrentDatabase}")
+                return True
         except Exception as e:
             print(f"❌ Connection failed: {e}")
             return False
