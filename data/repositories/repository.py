@@ -14,7 +14,7 @@ class InterlockRepository:
     TVF_COLUMNS = (
         "Date", "TIMESTAMP", "Level", "Interlock_Log_ID", "BSID",
         "PLC", "Direction", "Interlock_Message", "Status",
-        "TYPE", "BIT_INDEX", "Condition_Message"
+        "TYPE", "BIT_INDEX","Condition_Mnemonic", "Condition_Message"
     )
 
     def get_interlock_chain(

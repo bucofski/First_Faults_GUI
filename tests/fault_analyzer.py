@@ -378,7 +378,6 @@ class PatternAnalyzer:
         """
         Find faults that are increasing in frequency with statistical rigor.
         """
-        # ... existing code ...
         now = reference_date if reference_date else self.df['TIMESTAMP'].max()
         recent_start = now - pd.Timedelta(days=days_recent)
         previous_start = now - pd.Timedelta(days=days_recent + days_previous)
@@ -387,10 +386,13 @@ class PatternAnalyzer:
         previous = self.df[
             (self.df['TIMESTAMP'] >= previous_start) &
             (self.df['TIMESTAMP'] < recent_start)
-        ]
+            ]
 
-        recent_counts = recent['Condition_Mnemonic'].value_counts()
-        previous_counts = previous['Condition_Mnemonic'].value_counts()
+        # Group by Mnemonic + PLC to make it unique
+        group_cols = ['Condition_Mnemonic', 'PLC']
+
+        recent_counts = recent.groupby(group_cols).size()
+        previous_counts = previous.groupby(group_cols).size()
 
         recent_daily = recent_counts / days_recent
         previous_daily = previous_counts / days_previous
@@ -398,11 +400,12 @@ class PatternAnalyzer:
         significant_faults = recent_counts[recent_counts >= min_recent_count].index
 
         risers = []
-        for fault in significant_faults:
-            recent_rate = recent_daily.get(fault, 0)
-            previous_rate = previous_daily.get(fault, 0)
-            recent_count = recent_counts.get(fault, 0)
-            previous_count = previous_counts.get(fault, 0)
+        for fault_key in significant_faults:
+            mnemonic, plc = fault_key
+            recent_rate = recent_daily.get(fault_key, 0)
+            previous_rate = previous_daily.get(fault_key, 0)
+            recent_count = recent_counts.get(fault_key, 0)
+            previous_count = previous_counts.get(fault_key, 0)
 
             if previous_rate > 0:
                 change_pct = ((recent_rate - previous_rate) / previous_rate) * 100
@@ -419,7 +422,8 @@ class PatternAnalyzer:
                 confidence_score = change_pct * np.sqrt(recent_count)
 
             risers.append({
-                'Condition': fault,  # this is the mnemonic (kept for compatibility)
+                'Condition': mnemonic,
+                'PLC': plc,
                 'Recent_Daily_Avg': round(recent_rate, 2),
                 'Previous_Daily_Avg': round(previous_rate, 2),
                 'Change_%': round(change_pct, 1) if change_pct != float('inf') else 'NEW',
@@ -438,9 +442,11 @@ class PatternAnalyzer:
 
         # DISPLAY ONLY: attach an info message column
         info_map = self._mnemonic_to_info_map()
-        risers_df.insert(2, "Info_Message", risers_df["Condition"].map(info_map))
+        risers_df.insert(3, "Info_Message", risers_df["Condition"].map(info_map))
 
         return risers_df.head(top_n)
+
+
 
     def compare_time_periods(self,
                              period1_start: pd.Timestamp,
