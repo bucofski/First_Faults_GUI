@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from business.core.formatters import DictionaryResultFormatter
-from business.services.analyzer import InterlockAnalyzer
+from business.services.analyzer import InterlockService
 from data.repositories.repository import InterlockRepository
 
 
@@ -11,7 +11,7 @@ def save_interlock_results_to_file(interlock_number: int, limit: int = 1, output
     Analyze interlock and save hierarchical results to a text file.
     """
     # Initialize analyzer (uses InterlockRepository by default)
-    analyzer = InterlockAnalyzer(
+    analyzer = InterlockService(
         repository=InterlockRepository()
     )
 

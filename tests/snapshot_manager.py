@@ -1,35 +1,68 @@
-# Add to fault_analyzer.py or create new file: snapshot_manager.py
-
 import pandas as pd
-from datetime import datetime
-from data.repositories.repository import InterlockRepository
+from datetime import datetime, date
+from decimal import Decimal
+from typing import Optional
+from sqlalchemy import select, func, and_
+from sqlalchemy.orm import Session
+
+from data.repositories.DB_Connection import get_engine, get_session
+from ml_models import (
+    FaultTrendSnapshot, TrendAnalysisConfig,
+    ConditionDefinition, TextDefinition
+)
 
 
 class TrendSnapshotManager:
     """Manage periodic snapshots of fault trends for historical tracking."""
 
     def __init__(self):
-        self.repo = InterlockRepository()
+        self.engine = get_engine()
 
-    def save_snapshot(self, analyzer, days_recent=7, days_previous=30,
-                      snapshot_date=None):
-        """
-        Save current top risers analysis to database for historical tracking.
+    def _get_or_create_config(self, session: Session, days_recent: int, days_previous: int) -> TrendAnalysisConfig:
+        """Get or create a config for the given parameters."""
+        stmt = select(TrendAnalysisConfig).where(
+            and_(
+                TrendAnalysisConfig.days_recent == days_recent,
+                TrendAnalysisConfig.days_previous == days_previous
+            )
+        )
+        config = session.execute(stmt).scalar_one_or_none()
 
-        Args:
-            analyzer: PatternAnalyzer instance
-            days_recent: Recent period in days
-            days_previous: Previous period in days
-            snapshot_date: Date to record (defaults to today)
-        """
+        if config is None:
+            config = TrendAnalysisConfig(days_recent=days_recent, days_previous=days_previous)
+            session.add(config)
+            session.flush()
+
+        return config
+
+    def _get_condition_def_id(self, session: Session, condition_mnemonic: str, plc_name: str) -> Optional[int]:
+        """Look up CONDITION_DEF_ID using mnemonic + PLC."""
+        from ml_models import PLC
+
+        stmt = (
+            select(ConditionDefinition.condition_def_id)
+            .join(TextDefinition, ConditionDefinition.text_def_id == TextDefinition.text_def_id)
+            .join(PLC, ConditionDefinition.plc_id == PLC.plc_id)
+            .where(
+                and_(
+                    TextDefinition.mnemonic == condition_mnemonic,
+                    PLC.plc_name == plc_name
+                )
+            )
+        )
+        result = session.execute(stmt).scalars().first()
+        return result
+
+    def save_snapshot(self, analyzer, days_recent: int = 7, days_previous: int = 30,
+                      snapshot_date: Optional[date] = None):
+        """Save current top risers analysis to database."""
         if snapshot_date is None:
             snapshot_date = datetime.now().date()
 
-        # Get current top risers
         result = analyzer.top_risers(
             days_recent=days_recent,
             days_previous=days_previous,
-            top_n=50,  # Store top 50 for comprehensive tracking
+            top_n=50,
             min_recent_count=3
         )
 
@@ -37,115 +70,131 @@ class TrendSnapshotManager:
             print(f"No risers to snapshot for {snapshot_date}")
             return
 
-        # Prepare data for insertion
-        records = []
-        for idx, row in result.iterrows():
-            records.append({
-                'snapshot_date': snapshot_date,
-                'condition_mnemonic': row['Condition'][:500],  # Truncate if needed
-                'days_recent': days_recent,
-                'days_previous': days_previous,
-                'recent_daily_avg': row['Recent_Daily_Avg'],
-                'previous_daily_avg': row['Previous_Daily_Avg'],
-                'change_percent': None if row['Change_%'] == 'NEW' else row['Change_%'],
-                'absolute_change': row['Absolute_Change'],
-                'recent_count': row['Recent_Count'],
-                'previous_count': row['Previous_Count'],
-                'confidence_score': row['Confidence_Score'],
-                'rank_position': row['Rank']
-            })
+        with get_session() as session:
+            config = self._get_or_create_config(session, days_recent, days_previous)
 
-        # Insert into database
-        self._insert_snapshots(records)
-        print(f"✓ Saved {len(records)} fault trends for {snapshot_date}")
+            saved_count = 0
+            skipped_count = 0
 
-    def _insert_snapshots(self, records):
-        """Insert snapshot records into database."""
-        query = """
-                INSERT INTO fault_trend_snapshots
-                (snapshot_date, condition_mnemonic, days_recent, days_previous,
-                 recent_daily_avg, previous_daily_avg, change_percent, absolute_change,
-                 recent_count, previous_count, confidence_score, rank_position)
-                VALUES (%(snapshot_date)s, %(condition_mnemonic)s, %(days_recent)s,
-                        %(days_previous)s, %(recent_daily_avg)s, %(previous_daily_avg)s,
-                        %(change_percent)s, %(absolute_change)s, %(recent_count)s,
-                        %(previous_count)s, %(confidence_score)s, %(rank_position)s) ON DUPLICATE KEY \
-                UPDATE \
-                    recent_daily_avg = \
-                VALUES (recent_daily_avg), previous_daily_avg = \
-                VALUES (previous_daily_avg), change_percent = \
-                VALUES (change_percent), absolute_change = \
-                VALUES (absolute_change), recent_count = \
-                VALUES (recent_count), previous_count = \
-                VALUES (previous_count), confidence_score = \
-                VALUES (confidence_score), rank_position = \
-                VALUES (rank_position) \
-                """
+            for _, row in result.iterrows():
+                condition_def_id = self._get_condition_def_id(session, row['Condition'], row['PLC'])
 
-        with self.repo.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.executemany(query, records)
-            conn.commit()
+                if condition_def_id is None:
+                    skipped_count += 1
+                    continue
 
-    def get_fault_trend_history(self, condition_mnemonic, limit=12):
-        """
-        Get historical trend for a specific fault (last N snapshots).
+                # Check if exists, update or insert
+                existing = session.execute(
+                    select(FaultTrendSnapshot).where(
+                        and_(
+                            FaultTrendSnapshot.snapshot_date == snapshot_date,
+                            FaultTrendSnapshot.condition_def_id == condition_def_id,
+                            FaultTrendSnapshot.config_id == config.config_id
+                        )
+                    )
+                ).scalar_one_or_none()
 
-        Args:
-            condition_mnemonic The fault to track
-            limit: Number of snapshots to retrieve (default 12 = ~3 months weekly)
+                change_pct = None if row['Change_%'] == 'NEW' else Decimal(str(row['Change_%']))
 
-        Returns:
-            DataFrame with historical trend
-        """
-        query = """
-                SELECT snapshot_date, \
-                       recent_daily_avg, \
-                       previous_daily_avg, \
-                       change_percent, \
-                       confidence_score, \
-                       rank_position
-                FROM fault_trend_snapshots
-                WHERE condition_mnemonic = %s
-                  AND days_recent = 7 \
-                  AND days_previous = 30
-                ORDER BY snapshot_date DESC
-                    LIMIT %s \
-                """
+                if existing:
+                    existing.recent_daily_avg = Decimal(str(row['Recent_Daily_Avg']))
+                    existing.previous_daily_avg = Decimal(str(row['Previous_Daily_Avg']))
+                    existing.change_percent = change_pct
+                    existing.absolute_change = Decimal(str(row['Absolute_Change']))
+                    existing.recent_count = int(row['Recent_Count'])
+                    existing.previous_count = int(row['Previous_Count'])
+                    existing.confidence_score = Decimal(str(row['Confidence_Score']))
+                    existing.rank_position = int(row['Rank'])
+                else:
+                    snapshot = FaultTrendSnapshot(
+                        snapshot_date=snapshot_date,
+                        condition_def_id=condition_def_id,
+                        config_id=config.config_id,
+                        recent_daily_avg=Decimal(str(row['Recent_Daily_Avg'])),
+                        previous_daily_avg=Decimal(str(row['Previous_Daily_Avg'])),
+                        change_percent=change_pct,
+                        absolute_change=Decimal(str(row['Absolute_Change'])),
+                        recent_count=int(row['Recent_Count']),
+                        previous_count=int(row['Previous_Count']),
+                        confidence_score=Decimal(str(row['Confidence_Score'])),
+                        rank_position=int(row['Rank'])
+                    )
+                    session.add(snapshot)
 
-        with self.repo.get_connection() as conn:
-            df = pd.read_sql(query, conn, params=(condition_mnemonic, limit))
+                saved_count += 1
 
-        return df.sort_values('snapshot_date')  # Ascending for plotting
+        print(f"✓ Saved {saved_count} fault trends for {snapshot_date}")
+        if skipped_count > 0:
+            print(f"⚠ Skipped {skipped_count} faults (not found in CONDITION_DEFINITION)")
 
-    def compare_snapshots(self, date1, date2, top_n=10):
-        """
-        Compare top risers between two snapshot dates.
+    def get_fault_trend_history(self, condition_mnemonic: str, limit: int = 12) -> pd.DataFrame:
+        """Get historical trend for a specific fault."""
+        with get_session() as session:
+            stmt = (
+                select(
+                    FaultTrendSnapshot.snapshot_date,
+                    FaultTrendSnapshot.recent_daily_avg,
+                    FaultTrendSnapshot.previous_daily_avg,
+                    FaultTrendSnapshot.change_percent,
+                    FaultTrendSnapshot.confidence_score,
+                    FaultTrendSnapshot.rank_position
+                )
+                .join(ConditionDefinition, FaultTrendSnapshot.condition_def_id == ConditionDefinition.condition_def_id)
+                .join(TextDefinition, ConditionDefinition.text_def_id == TextDefinition.text_def_id)
+                .join(TrendAnalysisConfig, FaultTrendSnapshot.config_id == TrendAnalysisConfig.config_id)
+                .where(
+                    and_(
+                        TextDefinition.mnemonic == condition_mnemonic,
+                        TrendAnalysisConfig.days_recent == 7,
+                        TrendAnalysisConfig.days_previous == 30
+                    )
+                )
+                .order_by(FaultTrendSnapshot.snapshot_date.desc())
+                .limit(limit)
+            )
 
-        Args:
-            date1: First date (e.g., '2024-12-01')
-            date2: Second date (e.g., '2024-12-10')
-            top_n: Number of top faults to compare
-        """
-        query = """
-                SELECT snapshot_date, \
-                       condition_mnemonic, \
-                       recent_daily_avg, \
-                       change_percent, \
-                       confidence_score, \
-                       rank_position
-                FROM fault_trend_snapshots
-                WHERE snapshot_date IN (%s, %s)
-                  AND days_recent = 7 \
-                  AND days_previous = 30
-                  AND rank_position <= %s
-                ORDER BY snapshot_date, rank_position \
-                """
+            results = session.execute(stmt).all()
 
-        with self.repo.get_connection() as conn:
-            df = pd.read_sql(query, conn, params=(date1, date2, top_n))
+            df = pd.DataFrame(results, columns=[
+                'snapshot_date', 'recent_daily_avg', 'previous_daily_avg',
+                'change_percent', 'confidence_score', 'rank_position'
+            ])
 
-        # Pivot for easy comparison
+        return df.sort_values('snapshot_date')
+
+    def compare_snapshots(self, date1: date, date2: date, top_n: int = 10) -> pd.DataFrame:
+        """Compare top risers between two snapshot dates."""
+        with get_session() as session:
+            stmt = (
+                select(
+                    FaultTrendSnapshot.snapshot_date,
+                    TextDefinition.mnemonic.label('condition_mnemonic'),
+                    FaultTrendSnapshot.recent_daily_avg,
+                    FaultTrendSnapshot.change_percent,
+                    FaultTrendSnapshot.confidence_score,
+                    FaultTrendSnapshot.rank_position
+                )
+                .join(ConditionDefinition, FaultTrendSnapshot.condition_def_id == ConditionDefinition.condition_def_id)
+                .join(TextDefinition, ConditionDefinition.text_def_id == TextDefinition.text_def_id)
+                .join(TrendAnalysisConfig, FaultTrendSnapshot.config_id == TrendAnalysisConfig.config_id)
+                .where(
+                    and_(
+                        FaultTrendSnapshot.snapshot_date.in_([date1, date2]),
+                        TrendAnalysisConfig.days_recent == 7,
+                        TrendAnalysisConfig.days_previous == 30,
+                        FaultTrendSnapshot.rank_position <= top_n
+                    )
+                )
+                .order_by(FaultTrendSnapshot.snapshot_date, FaultTrendSnapshot.rank_position)
+            )
+
+            results = session.execute(stmt).all()
+
+            df = pd.DataFrame(results, columns=[
+                'snapshot_date', 'condition_mnemonic', 'recent_daily_avg',
+                'change_percent', 'confidence_score', 'rank_position'
+            ])
+
         comparison = df.pivot_table(
             index='condition_mnemonic',
             columns='snapshot_date',
@@ -155,90 +204,79 @@ class TrendSnapshotManager:
 
         return comparison
 
-    def get_stabilizing_faults(self, weeks_back=4, threshold_decrease=-20):
-        """
-        Find faults that are decreasing/stabilizing over recent weeks.
+    def get_top_risers(self, top_n: int = 5) -> pd.DataFrame:
+        """Get current top N rising faults from latest snapshot."""
+        with get_session() as session:
+            max_date_subq = select(func.max(FaultTrendSnapshot.snapshot_date)).scalar_subquery()
 
-        Args:
-            weeks_back: How many weeks to look back
-            threshold_decrease: % decrease to consider "stabilizing" (e.g., -20%)
+            stmt = (
+                select(
+                    TextDefinition.mnemonic.label('condition_mnemonic'),
+                    FaultTrendSnapshot.recent_daily_avg,
+                    FaultTrendSnapshot.change_percent,
+                    FaultTrendSnapshot.confidence_score
+                )
+                .join(ConditionDefinition, FaultTrendSnapshot.condition_def_id == ConditionDefinition.condition_def_id)
+                .join(TextDefinition, ConditionDefinition.text_def_id == TextDefinition.text_def_id)
+                .where(
+                    and_(
+                        FaultTrendSnapshot.snapshot_date == max_date_subq,
+                        FaultTrendSnapshot.rank_position <= top_n
+                    )
+                )
+                .order_by(FaultTrendSnapshot.rank_position)
+            )
 
-        Returns:
-            DataFrame of stabilizing faults
-        """
-        query = """
-                WITH recent_trends AS (SELECT condition_mnemonic, \
-                                              snapshot_date, \
-                                              recent_daily_avg, \
-                                              ROW_NUMBER() OVER (PARTITION BY condition_mnemonic ORDER BY snapshot_date DESC) as rn \
-                                       FROM fault_trend_snapshots \
-                                       WHERE snapshot_date >= DATE_SUB(CURDATE(), INTERVAL %s WEEK) \
-                                         AND days_recent = 7 \
-                                         AND days_previous = 30),
-                     first_last AS (SELECT condition_mnemonic, \
-                                           MAX(CASE WHEN rn = 1 THEN recent_daily_avg END) as latest_avg, \
-                                           MAX(CASE \
-                                                   WHEN rn = (SELECT MAX(rn) \
-                                                              FROM recent_trends rt2 \
-                                                              WHERE rt2.condition_mnemonic = recent_trends.condition_mnemonic) \
-                                                       THEN recent_daily_avg END)          as earliest_avg \
-                                    FROM recent_trends \
-                                    GROUP BY condition_mnemonic)
-                SELECT condition_mnemonic, \
-                       earliest_avg, \
-                       latest_avg, \
-                       ROUND(((latest_avg - earliest_avg) / earliest_avg) * 100, 1) as trend_change_percent
-                FROM first_last
-                WHERE earliest_avg > 0
-                  AND ((latest_avg - earliest_avg) / earliest_avg) * 100 <= %s
-                ORDER BY trend_change_percent ASC \
-                """
+            results = session.execute(stmt).all()
 
-        with self.repo.get_connection() as conn:
-            df = pd.read_sql(query, conn, params=(weeks_back, threshold_decrease))
+            return pd.DataFrame(results, columns=[
+                'condition_mnemonic', 'recent_daily_avg', 'change_percent', 'confidence_score'
+            ])
 
-        return df
+    def get_latest_snapshot_dates(self, limit: int = 2) -> list[date]:
+        """Get the most recent snapshot dates."""
+        with get_session() as session:
+            stmt = (
+                select(FaultTrendSnapshot.snapshot_date)
+                .distinct()
+                .order_by(FaultTrendSnapshot.snapshot_date.desc())
+                .limit(limit)
+            )
+            results = session.execute(stmt).scalars().all()
+            return list(results)
 
+    def get_summary_stats(self) -> dict:
+        """Get management summary statistics."""
+        with get_session() as session:
+            stmt = select(
+                func.count(FaultTrendSnapshot.condition_def_id.distinct()).label('total_tracked'),
+                func.max(FaultTrendSnapshot.snapshot_date).label('latest'),
+                func.min(FaultTrendSnapshot.snapshot_date).label('first'),
+                func.count(FaultTrendSnapshot.snapshot_date.distinct()).label('total_snapshots')
+            )
+            result = session.execute(stmt).one()
 
-# Usage in main.py or scheduled job
-def weekly_snapshot_job():
-    """Run this weekly (e.g., every Monday) to track trends."""
-    from ml_pipeline import load_interlock_data, prepare_features
-    from fault_analyzer import PatternAnalyzer
+            return {
+                'total_tracked_faults': result.total_tracked,
+                'latest_snapshot': result.latest,
+                'first_snapshot': result.first,
+                'total_snapshots': result.total_snapshots
+            }
 
-    # Load data
-    df = load_interlock_data(top_n=100000)
-    df = prepare_features(df)
+    def get_top_riser_mnemonic(self) -> Optional[str]:
+        """Get the mnemonic of the current #1 riser."""
+        with get_session() as session:
+            max_date_subq = select(func.max(FaultTrendSnapshot.snapshot_date)).scalar_subquery()
 
-    # Analyze
-    analyzer = PatternAnalyzer(df, root_cause_only=True)
-
-    # Save snapshot
-    snapshot_mgr = TrendSnapshotManager()
-    snapshot_mgr.save_snapshot(analyzer, days_recent=7, days_previous=30)
-
-    print("Weekly snapshot completed!")
-
-
-# Analysis examples
-def analyze_trends():
-    """Example: Analyze stabilizing/rising trends."""
-    snapshot_mgr = TrendSnapshotManager()
-
-    # Find stabilizing faults
-    print("\n=== Stabilizing Faults (last 4 weeks) ===")
-    stabilizing = snapshot_mgr.get_stabilizing_faults(weeks_back=4, threshold_decrease=-20)
-    print(stabilizing)
-
-    # Track specific fault over time
-    print("\n=== Trend for Specific Fault ===")
-    history = snapshot_mgr.get_fault_trend_history(
-        "Geen aanvraag stop algemeen",
-        limit=12
-    )
-    print(history)
-
-    # Compare two dates
-    print("\n=== Compare Two Weeks ===")
-    comparison = snapshot_mgr.compare_snapshots('2024-12-01', '2024-12-10')
-    print(comparison)
+            stmt = (
+                select(TextDefinition.mnemonic)
+                .join(ConditionDefinition, TextDefinition.text_def_id == ConditionDefinition.text_def_id)
+                .join(FaultTrendSnapshot, ConditionDefinition.condition_def_id == FaultTrendSnapshot.condition_def_id)
+                .where(
+                    and_(
+                        FaultTrendSnapshot.rank_position == 1,
+                        FaultTrendSnapshot.snapshot_date == max_date_subq
+                    )
+                )
+            )
+            return session.execute(stmt).scalar_one_or_none()

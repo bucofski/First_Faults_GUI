@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from business.services.analyzer import InterlockAnalyzer
+from business.services.analyzer import InterlockService
 from business.core.formatters import DictionaryResultFormatter, ConsoleResultFormatter
 
 
@@ -17,7 +17,7 @@ def main(
 ) -> int:
     """Command-line interface for interlock analysis."""
     try:
-        analyzer = InterlockAnalyzer()
+        analyzer = InterlockService()
 
         print("Testing SQL Server connection...")
         if not analyzer.test_connection():

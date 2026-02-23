@@ -1,6 +1,7 @@
 # main.py
 from ml_pipeline import load_interlock_data, prepare_features
 from fault_analyzer import PatternAnalyzer, InterlockPredictor
+from snapshot_manager import TrendSnapshotManager
 
 # Load data
 df = load_interlock_data(top_n=100000)
@@ -54,7 +55,7 @@ print(result['risers_df'].to_string(index=False))
 
 # === Train Predictor ===
 predictor = InterlockPredictor()
-predictor.train(df, target="Condition_Mnemonic", epochs=200, min_samples=5)
+predictor.train(df, target="Condition_Mnemonic", epochs=1000, min_samples=5)
 
 # === Validate predictions ===
 print("\n=== Model Validation ===")
@@ -78,3 +79,15 @@ print(predictor.predict_next_fault(
     bit_index=0,
     top_k=5
 ))
+
+print("\n=== DEBUG INFO ===")
+print(f"DataFrame PLC values: {df['PLC'].unique()[:5]}")
+print(f"DataFrame Condition_Mnemonic sample: {df['Condition_Mnemonic'].head(3).tolist()}")
+
+risers = analyzer.top_risers(days_recent=7, days_previous=30, top_n=5)
+print(f"\nTop risers columns: {risers.columns.tolist()}")
+print(f"Top risers sample:\n{risers[['Condition', 'PLC']].head()}")
+snapshot_mgr = TrendSnapshotManager()
+
+print("\n=== Saving Trend Snapshot ===")
+snapshot_mgr.save_snapshot(analyzer, days_recent=7, days_previous=30)

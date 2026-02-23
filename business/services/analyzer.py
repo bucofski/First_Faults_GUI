@@ -6,7 +6,7 @@ from business.core.tree_builder import InterlockTreeBuilder
 from data.model.models import InterlockNode
 from data.repositories.repository import InterlockRepository
 
-class InterlockAnalyzer:
+class InterlockService:
     """Main analyzer orchestrating the interlock analysis workflow."""
 
     def __init__(

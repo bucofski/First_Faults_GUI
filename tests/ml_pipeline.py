@@ -14,6 +14,11 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     """Prepare features for ML from interlock data."""
     df = df.copy()
 
+    # Strip whitespace from string columns
+    df['PLC'] = df['PLC'].str.strip()
+    if 'Condition_Mnemonic' in df.columns:
+        df['Condition_Mnemonic'] = df['Condition_Mnemonic'].str.strip()
+
     # Time-based features
     df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'])
     df['hour'] = df['TIMESTAMP'].dt.hour
@@ -28,7 +33,7 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # Create fault category from first few words of message
     df['Fault_Category'] = df['Condition_Mnemonic'].fillna('').apply(
-        lambda x: ' '.join(str(x).split()[:3])  # First 3 words as category
+        lambda x: ' '.join(str(x).split()[:3])
     )
 
     return df
