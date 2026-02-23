@@ -11,13 +11,13 @@ from flask import (
     send_file,
 )
 
-from business.services.analyzer import InterlockAnalyzer
+from business.services.analyzer import InterlockService
 from business.services.diagram_service_view import DiagramService
 
 from presentations.services.pdf_generator import PdfGenerator
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
-service_interlock = InterlockAnalyzer()
+service_interlock = InterlockService()
 
 
 def _parse_iso_datetime(value: str | None, field_name: str) -> dt.datetime | None:
