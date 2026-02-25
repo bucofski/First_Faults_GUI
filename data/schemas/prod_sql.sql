@@ -16,23 +16,23 @@ AS
 RETURN
 (
     WITH AnchorInterlock AS (
-        -- Get DISTINCT anchor interlocks (TOP N based on parameter) with optional filters
         SELECT DISTINCT TOP (ISNULL(@TopN, 100))
-            il.ID as AnchorID,
-            il.TIMESTAMP as AnchorTimestamp,
-            CAST(il.TIMESTAMP AS DATE) as AnchorDate,
-            il.ORDER_LOG as AnchorOrderLog
+            il.ID          AS AnchorID,
+            il.TIMESTAMP   AS AnchorTimestamp,
+            CAST(il.TIMESTAMP AS DATE) AS AnchorDate,
+            il.ORDER_LOG   AS AnchorOrderLog
         FROM First_Fault.dbo.FF_INTERLOCK_LOG il
         INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
             ON il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
         INNER JOIN First_Fault.dbo.PLC p
             ON idef.PLC_ID = p.PLC_ID
         WHERE (@TargetBSID IS NULL OR idef.NUMBER = @TargetBSID)
-            -- Apply timestamp range filters with intelligent handling
+            -- When no BSID: only true root interlocks (no upstream parent)
+            AND (@TargetBSID IS NOT NULL OR il.UPSTREAM_INTERLOCK_LOG_ID IS NULL)
+            -- Timestamp filters
             AND (
                 @FilterTimestampStart IS NULL
                 OR il.TIMESTAMP >= CASE
-                    -- If time component is midnight (00:00:00.000), treat as start of day
                     WHEN CAST(@FilterTimestampStart AS TIME) = '00:00:00.000'
                     THEN CAST(CAST(@FilterTimestampStart AS DATE) AS DATETIME)
                     ELSE @FilterTimestampStart
@@ -41,7 +41,6 @@ RETURN
             AND (
                 @FilterTimestampEnd IS NULL
                 OR il.TIMESTAMP <= CASE
-                    -- If time component is midnight (00:00:00.000), treat as end of that day
                     WHEN CAST(@FilterTimestampEnd AS TIME) = '00:00:00.000'
                     THEN DATEADD(SECOND, -1, DATEADD(DAY, 1, CAST(CAST(@FilterTimestampEnd AS DATE) AS DATETIME)))
                     ELSE @FilterTimestampEnd
@@ -64,18 +63,18 @@ RETURN
         ORDER BY il.TIMESTAMP DESC, il.ORDER_LOG DESC, il.ID DESC
     ),
     UpstreamChain AS (
-        -- Anchor: Start with selected interlocks
+        -- Level 0 = the anchor itself
         SELECT
-            il.ID as AnchorReference,
-            0 as Level,
+            il.ID                              AS AnchorReference,
+            0                                  AS Level,
             il.ID,
             il.TIMESTAMP,
-            CAST(il.TIMESTAMP AS DATE) as Date,
-            p.PLC_NAME as PLC,
-            idef.NUMBER as BSID,
-            td_interlock.MESSAGE as Interlock_Message,
-            il.UPSTREAM_INTERLOCK_LOG_ID as UPSTREAM_INTERLOCK_REF,
-            CAST('ANCHOR' AS NVARCHAR(20)) as Direction
+            CAST(il.TIMESTAMP AS DATE)         AS Date,
+            p.PLC_NAME                         AS PLC,
+            idef.NUMBER                        AS BSID,
+            td_interlock.MESSAGE               AS Interlock_Message,
+            il.UPSTREAM_INTERLOCK_LOG_ID       AS UPSTREAM_INTERLOCK_REF,
+            CAST('ANCHOR' AS NVARCHAR(20))     AS Direction
         FROM First_Fault.dbo.FF_INTERLOCK_LOG il
         INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
             ON il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
@@ -88,18 +87,18 @@ RETURN
 
         UNION ALL
 
-        -- Recursive: Follow upstream references
+        -- Recursive: follow upstream (Level +1, +2, …)
         SELECT
             uc.AnchorReference,
             uc.Level + 1,
             upstream_il.ID,
             upstream_il.TIMESTAMP,
             uc.Date,
-            p.PLC_NAME as PLC,
-            idef.NUMBER as BSID,
-            td_interlock.MESSAGE as Interlock_Message,
-            upstream_il.UPSTREAM_INTERLOCK_LOG_ID as UPSTREAM_INTERLOCK_REF,
-            CAST('UPSTREAM' AS NVARCHAR(20)) as Direction
+            p.PLC_NAME,
+            idef.NUMBER,
+            td_interlock.MESSAGE,
+            upstream_il.UPSTREAM_INTERLOCK_LOG_ID,
+            CAST('UPSTREAM' AS NVARCHAR(20))
         FROM UpstreamChain uc
         INNER JOIN First_Fault.dbo.FF_INTERLOCK_LOG upstream_il
             ON uc.UPSTREAM_INTERLOCK_REF = upstream_il.ID
@@ -113,18 +112,18 @@ RETURN
           AND uc.Level < 100
     ),
     DownstreamChain AS (
-        -- Start from anchor points
+        -- Level 0 = same anchor starting point
         SELECT
-            il.ID as AnchorReference,
-            0 as Level,
+            il.ID                              AS AnchorReference,
+            0                                  AS Level,
             il.ID,
             il.TIMESTAMP,
-            CAST(il.TIMESTAMP AS DATE) as Date,
-            p.PLC_NAME as PLC,
-            idef.NUMBER as BSID,
-            td_interlock.MESSAGE as Interlock_Message,
-            il.UPSTREAM_INTERLOCK_LOG_ID as UPSTREAM_INTERLOCK_REF,
-            CAST('ANCHOR' AS NVARCHAR(20)) as Direction
+            CAST(il.TIMESTAMP AS DATE)         AS Date,
+            p.PLC_NAME                         AS PLC,
+            idef.NUMBER                        AS BSID,
+            td_interlock.MESSAGE               AS Interlock_Message,
+            il.UPSTREAM_INTERLOCK_LOG_ID       AS UPSTREAM_INTERLOCK_REF,
+            CAST('ANCHOR' AS NVARCHAR(20))     AS Direction
         FROM First_Fault.dbo.FF_INTERLOCK_LOG il
         INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef
             ON il.INTERLOCK_DEF_ID = idef.INTERLOCK_DEF_ID
@@ -137,18 +136,18 @@ RETURN
 
         UNION ALL
 
-        -- Recursive: Follow downstream references
+        -- Recursive: follow ONLY explicit UPSTREAM_INTERLOCK_LOG_ID links downward
         SELECT
             dc.AnchorReference,
             dc.Level - 1,
             downstream_il.ID,
             downstream_il.TIMESTAMP,
             dc.Date,
-            p.PLC_NAME as PLC,
-            idef.NUMBER as BSID,
-            td_interlock.MESSAGE as Interlock_Message,
-            downstream_il.UPSTREAM_INTERLOCK_LOG_ID as UPSTREAM_INTERLOCK_REF,
-            CAST('DOWNSTREAM' AS NVARCHAR(20)) as Direction
+            p.PLC_NAME,
+            idef.NUMBER,
+            td_interlock.MESSAGE,
+            downstream_il.UPSTREAM_INTERLOCK_LOG_ID,
+            CAST('DOWNSTREAM' AS NVARCHAR(20))
         FROM DownstreamChain dc
         INNER JOIN First_Fault.dbo.FF_INTERLOCK_LOG downstream_il
             ON dc.ID = downstream_il.UPSTREAM_INTERLOCK_LOG_ID
@@ -158,9 +157,7 @@ RETURN
             ON idef.PLC_ID = p.PLC_ID
         INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
             ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
-        WHERE downstream_il.TIMESTAMP >= DATEADD(SECOND, -5, dc.TIMESTAMP)
-          AND downstream_il.TIMESTAMP <= DATEADD(SECOND, 5, dc.TIMESTAMP)
-          AND dc.Level > -100
+        WHERE dc.Level > -100
     ),
     CombinedChain AS (
         SELECT * FROM UpstreamChain
@@ -205,23 +202,27 @@ RETURN
 /*
 USAGE EXAMPLES:
 
--- Get last 10 interlocks (any BSID) with their FULL TREES (NULL defaults to 10):
-SELECT * FROM dbo.fn_InterlockChain( NULL, NULL, NULL, NULL, NULL, NULL)
-ORDER BY TIMESTAMP DESC, Date DESC, Level;
+-- Get last 10 interlocks (any BSID) with their FULL TREES (NULL defaults to 100):
+SELECT * FROM dbo.fn_InterlockChain(NULL, NULL, NULL, NULL, NULL, NULL)
+ORDER BY AnchorReference DESC, Level DESC, TIMESTAMP;
 
--- Get specific BSID with its tree (NULL defaults to 10):
-SELECT * FROM dbo.fn_InterlockChain(12345,  NULL, NULL, NULL, NULL, NULL)
-ORDER BY TIMESTAMP DESC, Date DESC, Level;
+-- Get specific BSID with its tree:
+SELECT * FROM dbo.fn_InterlockChain(12345, NULL, NULL, NULL, NULL, NULL)
+ORDER BY AnchorReference DESC, Level DESC, TIMESTAMP;
 
 -- Get top 5 of specific BSID with trees:
-SELECT * FROM dbo.fn_InterlockChain(12345, 5,  NULL, NULL, NULL, NULL)
-ORDER BY TIMESTAMP DESC, Date DESC, Level;
+SELECT * FROM dbo.fn_InterlockChain(12345, 5, NULL, NULL, NULL, NULL)
+ORDER BY AnchorReference DESC, Level DESC, TIMESTAMP;
 
--- Filter by date and get trees (NULL defaults to 10):
-SELECT * FROM dbo.fn_InterlockChain(NULL,  '2024-12-05', NULL, NULL, NULL, NULL)
-ORDER BY TIMESTAMP DESC, Date DESC, Level;
+-- Filter by date range:
+SELECT * FROM dbo.fn_InterlockChain(NULL, 20, '2025-11-25', '2025-11-25', NULL, NULL)
+ORDER BY AnchorReference DESC, Level DESC, TIMESTAMP;
 
 -- Filter by PLC and condition message:
-SELECT * FROM dbo.fn_InterlockChain( NULL, NULL, NULL, NULL, 'Emergency', 'PLC_001')
-ORDER BY TIMESTAMP DESC, Date DESC, Level;
+SELECT * FROM dbo.fn_InterlockChain(NULL, NULL, NULL, NULL, 'GeenStop', 'TDS')
+ORDER BY AnchorReference DESC, Level DESC, TIMESTAMP;
+
+-- Filter by date + PLC:
+SELECT * FROM dbo.fn_InterlockChain(NULL, 20, '2025-11-25', '2025-11-25', NULL, 'TDS')
+ORDER BY AnchorReference DESC, Level DESC, TIMESTAMP;
 */

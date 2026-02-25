@@ -16,27 +16,12 @@ class InterlockTreeBuilder:
 
         trees = []
 
-        for date, date_group in df.groupby("Date"):
-            chains = InterlockTreeBuilder._extract_chains(date_group)
-            for chain_df in chains:
-                root = InterlockTreeBuilder._build_chain_tree(chain_df)
-                if root:
-                    trees.append(root)
+        for anchor_ref, chain_df in df.groupby("AnchorReference"):
+            root = InterlockTreeBuilder._build_chain_tree(chain_df)
+            if root:
+                trees.append(root)
 
         return trees
-
-    @staticmethod
-    def _extract_chains(date_df: pd.DataFrame) -> list[pd.DataFrame]:
-        """Extract individual chains from a date group."""
-        chains = []
-        anchor_rows = date_df[date_df["Level"] == 0]
-
-        for _, anchor in anchor_rows.drop_duplicates(subset=["Interlock_Log_ID"]).iterrows():
-            timestamp = anchor["TIMESTAMP"]
-            chain = date_df[date_df["TIMESTAMP"] == timestamp]
-            chains.append(chain)
-
-        return chains
 
     @staticmethod
     def _build_chain_tree(chain_df: pd.DataFrame) -> InterlockNode | None:

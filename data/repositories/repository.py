@@ -12,9 +12,10 @@ class InterlockRepository:
     """Repository for interlock data access using session context manager."""
 
     TVF_COLUMNS = (
-        "Date", "TIMESTAMP", "Level", "Interlock_Log_ID", "BSID",
-        "PLC", "Direction", "Interlock_Message", "Status",
-        "TYPE", "BIT_INDEX","Condition_Mnemonic", "Condition_Message"
+        "AnchorReference", "Date", "Level", "Direction", "Interlock_Log_ID",
+        "TIMESTAMP", "PLC", "BSID", "Interlock_Message",
+        "TYPE", "BIT_INDEX", "Condition_Mnemonic", "Condition_Message",
+        "UPSTREAM_INTERLOCK_REF", "Status"
     )
 
     def get_interlock_chain(
@@ -52,9 +53,9 @@ class InterlockRepository:
         stmt = (
             select(interlock_func)
             .order_by(
-                interlock_func.c.TIMESTAMP.desc(),
-                interlock_func.c.Date.desc(),
-                interlock_func.c.Level
+                interlock_func.c.AnchorReference.desc(),
+                interlock_func.c.Level.desc(),
+                interlock_func.c.TIMESTAMP
             )
             .suffix_with("OPTION (RECOMPILE)")
         )
