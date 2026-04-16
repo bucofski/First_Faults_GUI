@@ -1,7 +1,6 @@
 -- Drop function if it exists
 IF OBJECT_ID('dbo.fn_InterlockChain', 'TF') IS NOT NULL
     DROP FUNCTION dbo.fn_InterlockChain;
-GO
 
 CREATE FUNCTION dbo.fn_InterlockChain (
     @TargetBSID INT = NULL,  -- Optional: If NULL, returns last N interlocks with their full trees
@@ -87,10 +86,10 @@ RETURN
 
         UNION ALL
 
-        -- Recursive: follow upstream (Level +1, +2, …)
+        -- Recursive: follow upstream (Level -1, -2, … toward root cause)
         SELECT
             uc.AnchorReference,
-            uc.Level + 1,
+            uc.Level - 1,
             upstream_il.ID,
             upstream_il.TIMESTAMP,
             uc.Date,
@@ -109,7 +108,7 @@ RETURN
         INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
             ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
         WHERE uc.UPSTREAM_INTERLOCK_REF IS NOT NULL
-          AND uc.Level < 100
+          AND uc.Level > -100
     ),
     DownstreamChain AS (
         -- Level 0 = same anchor starting point
@@ -139,7 +138,7 @@ RETURN
         -- Recursive: follow ONLY explicit UPSTREAM_INTERLOCK_LOG_ID links downward
         SELECT
             dc.AnchorReference,
-            dc.Level - 1,
+            dc.Level + 1,
             downstream_il.ID,
             downstream_il.TIMESTAMP,
             dc.Date,
@@ -157,7 +156,7 @@ RETURN
             ON idef.PLC_ID = p.PLC_ID
         INNER JOIN First_Fault.dbo.TEXT_DEFINITION td_interlock
             ON idef.TEXT_DEF_ID = td_interlock.TEXT_DEF_ID
-        WHERE dc.Level > -100
+        WHERE dc.Level < 100
     ),
     CombinedChain AS (
         SELECT * FROM UpstreamChain
@@ -168,7 +167,7 @@ RETURN
     SELECT
         cc.AnchorReference,
         cc.Date,
-        cc.Level,
+        cc.Level - MAX(cc.Level) OVER (PARTITION BY cc.AnchorReference) AS Level,
         cc.Direction,
         cc.ID as Interlock_Log_ID,
         cc.TIMESTAMP,

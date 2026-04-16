@@ -52,10 +52,11 @@ BEGIN TRY
     -- ========================================================================
     PRINT 'Step 2: Migrating TEXT_DEFINITION (unique MNEMONIC+MESSAGE pairs)...';
 
-    INSERT INTO First_Fault.dbo.TEXT_DEFINITION (MNEMONIC, MESSAGE)
+    INSERT INTO First_Fault.dbo.TEXT_DEFINITION (MNEMONIC, MESSAGE, REPORTING)
     SELECT DISTINCT
         CAST(MNEMONIC AS NVARCHAR(MAX)) COLLATE Latin1_General_CI_AS as MNEMONIC,
-        CAST(MESSAGE AS NVARCHAR(MAX)) COLLATE Latin1_General_CI_AS as MESSAGE
+        CAST(MESSAGE AS NVARCHAR(MAX)) COLLATE Latin1_General_CI_AS as MESSAGE,
+        1 as REPORTING  -- default: include all migrated entries in reporting
     FROM (
         SELECT DISTINCT
             CAST(MNEMONIC AS NVARCHAR(MAX)) as MNEMONIC,

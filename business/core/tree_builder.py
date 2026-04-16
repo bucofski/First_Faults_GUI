@@ -26,7 +26,7 @@ class InterlockTreeBuilder:
     @staticmethod
     def _build_chain_tree(chain_df: pd.DataFrame) -> InterlockNode | None:
         """Build a tree from a single chain DataFrame."""
-        levels = sorted(chain_df["Level"].unique(), reverse=False)
+        levels = sorted(chain_df["Level"].unique(), reverse=True)
 
         if not levels:
             return None
@@ -73,15 +73,19 @@ class InterlockTreeBuilder:
 
     @staticmethod
     def _extract_conditions(level_data: pd.DataFrame) -> list[InterlockCondition]:
-        """Extract conditions from level data."""
+        """Extract conditions from level data, deduplicating on (type, bit_index, message)."""
         conditions = []
+        seen: set[tuple] = set()
         for _, row in level_data.iterrows():
             if pd.notna(row.get("Condition_Message")):
-                conditions.append(InterlockCondition(
-                    type=row["TYPE"],
-                    bit_index=int(row["BIT_INDEX"]),  # ← Force conversion to int!
-                    message=row["Condition_Message"]
-                ))
+                key = (row["TYPE"], int(row["BIT_INDEX"]), row["Condition_Message"])
+                if key not in seen:
+                    seen.add(key)
+                    conditions.append(InterlockCondition(
+                        type=row["TYPE"],
+                        bit_index=int(row["BIT_INDEX"]),
+                        message=row["Condition_Message"]
+                    ))
         return conditions
 
     @staticmethod
