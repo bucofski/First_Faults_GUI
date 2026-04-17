@@ -13,6 +13,7 @@ from flask import (
 
 from business.services.analyzer import InterlockService
 from business.services.diagram_service_view import DiagramService
+from business.services.fault_count_service import FaultCountService
 
 from presentations.services.pdf_generator import PdfGenerator
 
@@ -130,15 +131,23 @@ def contact():
 
 @bp.route("/diagrams")
 def diagrams():
-    chart_html = DiagramService.grouped_bar_chart_html()
+    selected_plc = request.args.get("plc", "").strip() or None
+    plc_names    = FaultCountService.get_all_plc_names()
+
+    chart_html  = DiagramService.grouped_bar_chart_html()
     chart_html2 = DiagramService.grouped_bar_chart_2_html()
-    pie_html = DiagramService.pie_chart_html()
+    pie_html    = DiagramService.pie_chart_html()
+    heatmap     = DiagramService.heatmap_html(selected_plc) if selected_plc else ""
+
     return render_template(
         "diagrams.html",
         title="Diagrams",
         chart_html=chart_html,
         chart_2_html=chart_html2,
         pie_html=pie_html,
+        heatmap_html=heatmap,
+        plc_names=plc_names,
+        selected_plc=selected_plc,
     )
 
 

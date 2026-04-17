@@ -66,6 +66,48 @@ class TopRiser:
 
 
 @dataclass
+class RepeatOffender:
+    mnemonic:       str
+    plc_name:       str
+    max_per_hour:   int    # highest count in any single hour
+
+    def to_dict(self) -> dict:
+        return {
+            "mnemonic":     self.mnemonic,
+            "plc_name":     self.plc_name,
+            "max_per_hour": self.max_per_hour,
+        }
+
+
+@dataclass
+class MtbfResult:
+    plc_name:    str
+    avg_hours:   float
+    fault_count: int
+
+    def to_dict(self) -> dict:
+        return {
+            "plc_name":    self.plc_name,
+            "avg_hours":   round(self.avg_hours, 2),
+            "fault_count": self.fault_count,
+        }
+
+
+@dataclass
+class HeatmapData:
+    plc_name: str
+    date_labels: list[str]       # one label per day, oldest first
+    counts: list[list[int]]      # counts[day_index][hour] — 24 values per day
+
+    def to_dict(self) -> dict:
+        return {
+            "plc_name":    self.plc_name,
+            "date_labels": self.date_labels,
+            "counts":      self.counts,
+        }
+
+
+@dataclass
 class DailyFaultCounts:
     reference_date: date          # Brussels local yesterday
     by_hour: list[HourCount]      # 24 entries, hour 0-23
@@ -155,6 +197,191 @@ class FaultCountService:
                 ))
 
         return sorted(risers, key=lambda x: x.delta_pct, reverse=True)[:top_n]
+
+    def get_repeat_offenders(
+        self,
+        days: int = 30,
+        top_n: int = 10,
+    ) -> list[RepeatOffender]:
+        """Top N faults by max occurrences within a single Brussels hour."""
+        today      = datetime.now(tz=_BRUSSELS).date()
+        end_date   = today - timedelta(days=1)
+        start_date = end_date - timedelta(days=days - 1)
+
+        rows = self._fetch_window(
+            self._date_to_utc(start_date),
+            self._date_to_utc(today),
+        )
+
+        # count per (mnemonic, plc, hour_bucket)
+        bucket_counts: dict[tuple, int] = defaultdict(int)
+        for utc_dt, _plc_id, _text_def_id, plc_name, mnemonic in rows:
+            local_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone(_BRUSSELS)
+            bucket   = (mnemonic.strip(), plc_name.strip(), local_dt.date(), local_dt.hour)
+            bucket_counts[bucket] += 1
+
+        # max count across all hours per (mnemonic, plc)
+        max_per_fault: dict[tuple, int] = defaultdict(int)
+        for (mnemonic, plc, _date, _hour), count in bucket_counts.items():
+            key = (mnemonic, plc)
+            if count > max_per_fault[key]:
+                max_per_fault[key] = count
+
+        results = [
+            RepeatOffender(mnemonic=mnemonic, plc_name=plc, max_per_hour=count)
+            for (mnemonic, plc), count in max_per_fault.items()
+            if count > 1
+        ]
+        return sorted(results, key=lambda x: x.max_per_hour, reverse=True)[:top_n]
+
+    def get_repeat_offenders_snapshot_data(
+        self,
+        days: int = 30,
+        top_n: int = 10,
+    ) -> list[tuple[int, int, int]]:
+        """Return (plc_id, text_def_id, max_per_hour) for saving to snapshot table."""
+        today      = datetime.now(tz=_BRUSSELS).date()
+        end_date   = today - timedelta(days=1)
+        start_date = end_date - timedelta(days=days - 1)
+
+        rows = self._fetch_window(
+            self._date_to_utc(start_date),
+            self._date_to_utc(today),
+        )
+
+        bucket_counts: dict[tuple, int] = defaultdict(int)
+        for utc_dt, plc_id, text_def_id, _, _ in rows:
+            local_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone(_BRUSSELS)
+            bucket   = (plc_id, text_def_id, local_dt.date(), local_dt.hour)
+            bucket_counts[bucket] += 1
+
+        max_per_fault: dict[tuple, int] = defaultdict(int)
+        for (plc_id, text_def_id, _date, _hour), count in bucket_counts.items():
+            key = (plc_id, text_def_id)
+            if count > max_per_fault[key]:
+                max_per_fault[key] = count
+
+        results = [
+            (plc_id, text_def_id, count)
+            for (plc_id, text_def_id), count in max_per_fault.items()
+            if count > 1
+        ]
+        return sorted(results, key=lambda x: x[2], reverse=True)[:top_n]
+
+    def get_mtbf_per_plc(self, days: int = 30) -> list[MtbfResult]:
+        """Average hours between consecutive root-cause faults per PLC."""
+        today     = datetime.now(tz=_BRUSSELS).date()
+        end_date  = today - timedelta(days=1)
+        start_date = end_date - timedelta(days=days - 1)
+
+        rows = self._fetch_window(
+            self._date_to_utc(start_date),
+            self._date_to_utc(today),
+        )
+
+        plc_timestamps: dict[str, list[datetime]] = defaultdict(list)
+        for utc_dt, _plc_id, _text_def_id, plc_name, _ in rows:
+            plc_timestamps[plc_name.strip()].append(
+                utc_dt.replace(tzinfo=timezone.utc)
+            )
+
+        results = []
+        for plc_name, timestamps in plc_timestamps.items():
+            if len(timestamps) < 2:
+                continue
+            timestamps.sort()
+            gaps = [
+                (b - a).total_seconds() / 3600
+                for a, b in zip(timestamps, timestamps[1:])
+            ]
+            results.append(MtbfResult(
+                plc_name=plc_name,
+                avg_hours=sum(gaps) / len(gaps),
+                fault_count=len(timestamps),
+            ))
+
+        return sorted(results, key=lambda x: x.avg_hours)
+
+    def get_mtbf_snapshot_data(
+        self, days: int = 30
+    ) -> list[tuple[int, float, int]]:
+        """Return (plc_id, avg_hours, fault_count) for saving to snapshot table."""
+        today      = datetime.now(tz=_BRUSSELS).date()
+        end_date   = today - timedelta(days=1)
+        start_date = end_date - timedelta(days=days - 1)
+
+        rows = self._fetch_window(
+            self._date_to_utc(start_date),
+            self._date_to_utc(today),
+        )
+
+        plc_timestamps: dict[int, list[datetime]] = defaultdict(list)
+        for utc_dt, plc_id, _text_def_id, _, _ in rows:
+            plc_timestamps[plc_id].append(utc_dt.replace(tzinfo=timezone.utc))
+
+        results = []
+        for plc_id, timestamps in plc_timestamps.items():
+            if len(timestamps) < 2:
+                continue
+            timestamps.sort()
+            gaps = [
+                (b - a).total_seconds() / 3600
+                for a, b in zip(timestamps, timestamps[1:])
+            ]
+            results.append((plc_id, sum(gaps) / len(gaps), len(timestamps)))
+
+        return results
+
+    def get_heatmap_data(
+        self,
+        plc_name: str,
+        days: int = 30,
+    ) -> HeatmapData:
+        """Return fault counts per day × hour for a single PLC (Brussels time)."""
+        today     = datetime.now(tz=_BRUSSELS).date()
+        end_date  = today - timedelta(days=1)
+        start_date = end_date - timedelta(days=days - 1)
+
+        start_utc = self._date_to_utc(start_date)
+        end_utc   = self._date_to_utc(today)
+
+        stmt = (
+            select(RootCauseFault.utc_timestamp)
+            .where(RootCauseFault.utc_timestamp >= start_utc.replace(tzinfo=None))
+            .where(RootCauseFault.utc_timestamp <  end_utc.replace(tzinfo=None))
+            .where(RootCauseFault.plc_name == plc_name)
+        )
+        with get_session() as session:
+            rows = session.execute(stmt).all()
+
+        counts: dict[date, list[int]] = {}
+        for i in range(days):
+            d = start_date + timedelta(days=i)
+            counts[d] = [0] * 24
+
+        for (utc_dt,) in rows:
+            utc_aware  = utc_dt.replace(tzinfo=timezone.utc)
+            local_dt   = utc_aware.astimezone(_BRUSSELS)
+            local_date = local_dt.date()
+            if local_date in counts:
+                counts[local_date][local_dt.hour] += 1
+
+        sorted_dates = sorted(counts.keys())
+        return HeatmapData(
+            plc_name=plc_name,
+            date_labels=[str(d) for d in sorted_dates],
+            counts=[counts[d] for d in sorted_dates],
+        )
+
+    @staticmethod
+    def get_all_plc_names() -> list[str]:
+        """Return all PLC names sorted alphabetically."""
+        from data.orm.reporting_orm import Plc
+        with get_session() as session:
+            rows = session.execute(
+                select(Plc.plc_name).order_by(Plc.plc_name)
+            ).all()
+        return [r.plc_name.strip() for r in rows]
 
     # ------------------------------------------------------------------
 

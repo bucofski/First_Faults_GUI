@@ -70,3 +70,27 @@ class TopRiserSnapshot(Base):
 
     plc:      Mapped[Plc]            = relationship("Plc")
     text_def: Mapped[TextDefinition] = relationship("TextDefinition")
+
+
+class MtbfSnapshot(Base):
+    __tablename__ = "mtbf_snapshot"
+
+    id:            Mapped[int]   = mapped_column(Integer, primary_key=True)
+    snapshot_date: Mapped[date]  = mapped_column(DATE)
+    days_window:   Mapped[int]   = mapped_column(SmallInteger)
+    plc_id:        Mapped[int]   = mapped_column(Integer, ForeignKey("PLC.PLC_ID"))
+    avg_hours:     Mapped[float] = mapped_column(Float)
+    fault_count:   Mapped[int]   = mapped_column(Integer)
+
+    plc: Mapped[Plc] = relationship("Plc")
+
+
+class RepeatOffenderSnapshot(Base):
+    __tablename__ = "repeat_offender_snapshot"
+
+    id:            Mapped[int]  = mapped_column(Integer, primary_key=True)
+    snapshot_date: Mapped[date] = mapped_column(DATE)
+    days_window:   Mapped[int]  = mapped_column(SmallInteger)
+    plc_id:        Mapped[int]  = mapped_column(Integer, ForeignKey("PLC.PLC_ID"))
+    text_def_id:   Mapped[int]  = mapped_column(Integer, ForeignKey("TEXT_DEFINITION.TEXT_DEF_ID"))
+    max_per_hour:  Mapped[int]  = mapped_column(Integer)

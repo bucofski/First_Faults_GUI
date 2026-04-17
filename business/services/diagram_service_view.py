@@ -113,3 +113,99 @@ class DiagramService:
             height=max(300, top_n * 35),
         )
         return plot(fig, include_plotlyjs=False, output_type='div')
+
+    @staticmethod
+    def repeat_offenders_html(days: int = 30, top_n: int = 10) -> str:
+        repo = SnapshotRepository()
+        snapshot_date, rows = repo.get_latest_repeat_offenders(days_window=days, top_n=top_n)
+
+        if rows:
+            labels = [f"{mnemonic} ({plc})" for mnemonic, plc, _ in rows]
+            counts = [c for _, _, c in rows]
+            title  = f"Repeat offenders — {snapshot_date} (last {days}d)"
+        else:
+            live   = FaultCountService().get_repeat_offenders(days=days, top_n=top_n)
+            labels = [f"{r.mnemonic} ({r.plc_name})" for r in live]
+            counts = [r.max_per_hour for r in live]
+            title  = f"Repeat offenders — last {days}d (live)"
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=counts,
+            y=labels,
+            orientation='h',
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Max occurrences in 1h: %{x}"
+                "<extra></extra>"
+            ),
+            marker_color='#ff7f0e',
+        ))
+        fig.update_layout(
+            title=title,
+            xaxis_title="Max times fault appeared in a single hour",
+            yaxis=dict(autorange="reversed"),
+            margin=dict(t=50, r=20, b=60, l=220),
+            height=max(300, top_n * 35),
+        )
+        return plot(fig, include_plotlyjs=False, output_type='div')
+
+    @staticmethod
+    def mtbf_html(days: int = 30) -> str:
+        repo = SnapshotRepository()
+        snapshot_date, rows = repo.get_latest_mtbf(days_window=days)
+
+        if rows:
+            plcs        = [r[0] for r in rows]
+            avg_hours   = [r[1] for r in rows]
+            fault_counts = [r[2] for r in rows]
+            title = f"MTBF per PLC — {snapshot_date} (last {days}d)"
+        else:
+            live = FaultCountService().get_mtbf_per_plc(days=days)
+            plcs         = [r.plc_name    for r in live]
+            avg_hours    = [r.avg_hours   for r in live]
+            fault_counts = [r.fault_count for r in live]
+            title = f"MTBF per PLC — last {days}d (live)"
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=avg_hours,
+            y=plcs,
+            orientation='h',
+            customdata=fault_counts,
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Avg between faults: %{x:.1f}h<br>"
+                "Fault count: %{customdata}"
+                "<extra></extra>"
+            ),
+            marker_color='#2ca02c',
+        ))
+        fig.update_layout(
+            title=title,
+            xaxis_title="Avg hours between faults (higher = more stable)",
+            yaxis=dict(autorange="reversed"),
+            margin=dict(t=50, r=20, b=60, l=120),
+            height=max(300, len(plcs) * 35),
+        )
+        return plot(fig, include_plotlyjs=False, output_type='div')
+
+    @staticmethod
+    def heatmap_html(plc_name: str, days: int = 30) -> str:
+        data = FaultCountService().get_heatmap_data(plc_name=plc_name, days=days)
+
+        fig = go.Figure(data=go.Heatmap(
+            z=data.counts,
+            x=[f"{h:02d}h" for h in range(24)],
+            y=data.date_labels,
+            colorscale="YlOrRd",
+            hovertemplate="Date: %{y}<br>Hour: %{x}<br>Faults: %{z}<extra></extra>",
+        ))
+        fig.update_layout(
+            title=f"Fault heatmap — {plc_name} (last {days} days)",
+            xaxis_title="Hour (Brussels)",
+            yaxis_title="Date",
+            margin=dict(t=50, r=20, b=60, l=100),
+            height=max(300, days * 18),
+        )
+        return plot(fig, include_plotlyjs=False, output_type='div')

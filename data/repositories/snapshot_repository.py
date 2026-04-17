@@ -5,7 +5,8 @@ from datetime import date, timedelta
 from sqlalchemy import delete, select
 
 from data.orm.reporting_orm import (
-    DailyHourSnapshot, DailyPlcSnapshot, TopRiserSnapshot,
+    DailyHourSnapshot, DailyPlcSnapshot, MtbfSnapshot,
+    RepeatOffenderSnapshot, TopRiserSnapshot,
 )
 from data.repositories.DB_Connection import get_session
 
@@ -66,6 +67,27 @@ class SnapshotRepository:
                     recent_count=recent,
                     baseline_count=baseline,
                     delta_pct=delta_pct,
+                ))
+
+    def save_mtbf(
+        self,
+        snapshot_date: date,
+        days_window:   int,
+        rows: list[tuple[int, float, int]],   # (plc_id, avg_hours, fault_count)
+    ) -> None:
+        with get_session() as session:
+            session.execute(
+                delete(MtbfSnapshot)
+                .where(MtbfSnapshot.snapshot_date == snapshot_date)
+                .where(MtbfSnapshot.days_window   == days_window)
+            )
+            for plc_id, avg_hours, fault_count in rows:
+                session.add(MtbfSnapshot(
+                    snapshot_date=snapshot_date,
+                    days_window=days_window,
+                    plc_id=plc_id,
+                    avg_hours=avg_hours,
+                    fault_count=fault_count,
                 ))
 
     # ------------------------------------------------------------------
@@ -149,6 +171,116 @@ class SnapshotRepository:
                 for r in rows
             ]
 
+    def save_repeat_offenders(
+        self,
+        snapshot_date: date,
+        days_window:   int,
+        rows: list[tuple[int, int, int]],  # (plc_id, text_def_id, max_per_hour)
+    ) -> None:
+        with get_session() as session:
+            session.execute(
+                delete(RepeatOffenderSnapshot)
+                .where(RepeatOffenderSnapshot.snapshot_date == snapshot_date)
+                .where(RepeatOffenderSnapshot.days_window   == days_window)
+            )
+            for plc_id, text_def_id, max_per_hour in rows:
+                session.add(RepeatOffenderSnapshot(
+                    snapshot_date=snapshot_date,
+                    days_window=days_window,
+                    plc_id=plc_id,
+                    text_def_id=text_def_id,
+                    max_per_hour=max_per_hour,
+                ))
+
+    def get_latest_repeat_offenders(
+        self,
+        days_window: int = 30,
+        top_n:       int = 10,
+    ) -> tuple[date | None, list[tuple[str, str, int]]]:
+        """Return (snapshot_date, [(mnemonic, plc_name, max_per_hour), ...])."""
+        with get_session() as session:
+            latest = session.execute(
+                select(RepeatOffenderSnapshot.snapshot_date)
+                .where(RepeatOffenderSnapshot.days_window == days_window)
+                .order_by(RepeatOffenderSnapshot.snapshot_date.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+
+            if latest is None:
+                return None, []
+
+            rows = session.execute(
+                select(
+                    RepeatOffenderSnapshot.plc_id,
+                    RepeatOffenderSnapshot.text_def_id,
+                    RepeatOffenderSnapshot.max_per_hour,
+                )
+                .where(RepeatOffenderSnapshot.snapshot_date == latest)
+                .where(RepeatOffenderSnapshot.days_window   == days_window)
+                .order_by(RepeatOffenderSnapshot.max_per_hour.desc())
+                .limit(top_n)
+            ).all()
+
+            from data.orm.reporting_orm import Plc, TextDefinition
+            plc_ids     = [r.plc_id      for r in rows]
+            text_def_ids = [r.text_def_id for r in rows]
+
+            plc_names = {
+                pid: name.strip() for pid, name in session.execute(
+                    select(Plc.plc_id, Plc.plc_name).where(Plc.plc_id.in_(plc_ids))
+                ).all()
+            }
+            mnemonics = {
+                tid: m.strip() for tid, m in session.execute(
+                    select(TextDefinition.text_def_id, TextDefinition.mnemonic)
+                    .where(TextDefinition.text_def_id.in_(text_def_ids))
+                ).all()
+            }
+
+            return latest, [
+                (
+                    mnemonics.get(r.text_def_id, str(r.text_def_id)),
+                    plc_names.get(r.plc_id, str(r.plc_id)),
+                    r.max_per_hour,
+                )
+                for r in rows
+            ]
+
+    def get_latest_mtbf(
+        self, days_window: int = 30
+    ) -> tuple[date | None, list[tuple[str, float, int]]]:
+        """Return (snapshot_date, [(plc_name, avg_hours, fault_count), ...]) ascending by avg_hours."""
+        with get_session() as session:
+            latest = session.execute(
+                select(MtbfSnapshot.snapshot_date)
+                .where(MtbfSnapshot.days_window == days_window)
+                .order_by(MtbfSnapshot.snapshot_date.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+
+            if latest is None:
+                return None, []
+
+            rows = session.execute(
+                select(MtbfSnapshot.avg_hours, MtbfSnapshot.fault_count, MtbfSnapshot.plc_id)
+                .where(MtbfSnapshot.snapshot_date == latest)
+                .where(MtbfSnapshot.days_window   == days_window)
+                .order_by(MtbfSnapshot.avg_hours)
+            ).all()
+
+            plc_ids = [r.plc_id for r in rows]
+            from data.orm.reporting_orm import Plc
+            plc_names = {
+                plc_id: name for plc_id, name in session.execute(
+                    select(Plc.plc_id, Plc.plc_name).where(Plc.plc_id.in_(plc_ids))
+                ).all()
+            }
+
+            return latest, [
+                (plc_names.get(r.plc_id, str(r.plc_id)).strip(), r.avg_hours, r.fault_count)
+                for r in rows
+            ]
+
     # ------------------------------------------------------------------
     # Cleanup
     # ------------------------------------------------------------------
@@ -156,7 +288,7 @@ class SnapshotRepository:
     def cleanup_old_snapshots(self, keep_days: int = RETENTION_DAYS) -> None:
         cutoff = date.today() - timedelta(days=keep_days)
         with get_session() as session:
-            for model in (DailyHourSnapshot, DailyPlcSnapshot, TopRiserSnapshot):
+            for model in (DailyHourSnapshot, DailyPlcSnapshot, TopRiserSnapshot, MtbfSnapshot, RepeatOffenderSnapshot):
                 session.execute(
                     delete(model).where(model.snapshot_date < cutoff)
                 )

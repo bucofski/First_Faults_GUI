@@ -55,3 +55,26 @@ CREATE TABLE dbo.top_riser_snapshot (
     CONSTRAINT FK_top_riser_text FOREIGN KEY (text_def_id) REFERENCES dbo.TEXT_DEFINITION(TEXT_DEF_ID),
     CONSTRAINT UQ_top_riser      UNIQUE (snapshot_date, recent_days, baseline_days, plc_id, text_def_id)
 );
+
+CREATE TABLE dbo.mtbf_snapshot (
+    id            INT      PRIMARY KEY IDENTITY(1,1),
+    snapshot_date DATE     NOT NULL,
+    days_window   SMALLINT NOT NULL,
+    plc_id        INT      NOT NULL,
+    avg_hours     FLOAT    NOT NULL,
+    fault_count   INT      NOT NULL,
+    CONSTRAINT FK_mtbf_plc FOREIGN KEY (plc_id) REFERENCES dbo.PLC(PLC_ID),
+    CONSTRAINT UQ_mtbf     UNIQUE (snapshot_date, days_window, plc_id)
+);
+
+CREATE TABLE dbo.repeat_offender_snapshot (
+    id            INT      PRIMARY KEY IDENTITY(1,1),
+    snapshot_date DATE     NOT NULL,
+    days_window   SMALLINT NOT NULL,
+    plc_id        INT      NOT NULL,
+    text_def_id   INT      NOT NULL,
+    max_per_hour  INT      NOT NULL,
+    CONSTRAINT FK_repeat_plc  FOREIGN KEY (plc_id)      REFERENCES dbo.PLC(PLC_ID),
+    CONSTRAINT FK_repeat_text FOREIGN KEY (text_def_id) REFERENCES dbo.TEXT_DEFINITION(TEXT_DEF_ID),
+    CONSTRAINT UQ_repeat      UNIQUE (snapshot_date, days_window, plc_id, text_def_id)
+);

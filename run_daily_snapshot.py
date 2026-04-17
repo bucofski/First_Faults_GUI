@@ -18,6 +18,7 @@ except ImportError:
 RECENT_DAYS   = 7
 BASELINE_DAYS = 30
 TOP_N         = 10
+MTBF_DAYS     = 30
 
 
 def run() -> None:
@@ -34,13 +35,20 @@ def run() -> None:
         top_n=TOP_N,
     )
 
+    mtbf     = service.get_mtbf_snapshot_data(days=MTBF_DAYS)
+    repeats  = service.get_repeat_offenders_snapshot_data(days=MTBF_DAYS, top_n=10)
+
     repo.save_daily_counts(reference_date, by_hour, by_plc)
     repo.save_top_risers(reference_date, RECENT_DAYS, BASELINE_DAYS, risers)
+    repo.save_mtbf(reference_date, MTBF_DAYS, mtbf)
+    repo.save_repeat_offenders(reference_date, MTBF_DAYS, repeats)
     repo.cleanup_old_snapshots()
 
-    print(f"  hours saved : {len(by_hour)}")
-    print(f"  PLCs saved  : {len(by_plc)}")
-    print(f"  risers saved: {len(risers)}")
+    print(f"  hours saved   : {len(by_hour)}")
+    print(f"  PLCs saved    : {len(by_plc)}")
+    print(f"  risers saved  : {len(risers)}")
+    print(f"  MTBF saved    : {len(mtbf)}")
+    print(f"  repeats saved : {len(repeats)}")
     print("Done.")
 
 
