@@ -57,6 +57,22 @@ def run() -> None:
         except Exception as e:
             print(f"ERROR: {e}")
 
+    print("Backfilling MTBF ...")
+    try:
+        mtbf = service.get_mtbf_snapshot_data(days=30)
+        repo.save_mtbf(today - timedelta(days=1), 30, mtbf)
+        print(f"  {len(mtbf)} PLCs saved")
+    except Exception as e:
+        print(f"  ERROR: {e}")
+
+    print("Backfilling repeat offenders ...")
+    try:
+        repeats = service.get_repeat_offenders_snapshot_data(days=30, top_n=10)
+        repo.save_repeat_offenders(today - timedelta(days=1), 30, repeats)
+        print(f"  {len(repeats)} faults saved")
+    except Exception as e:
+        print(f"  ERROR: {e}")
+
     print("Backfilling weekly trend data ...")
     try:
         trend = service.get_weekly_trend_snapshot_data(weeks=52)
