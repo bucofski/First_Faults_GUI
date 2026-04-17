@@ -94,3 +94,13 @@ class RepeatOffenderSnapshot(Base):
     plc_id:        Mapped[int]  = mapped_column(Integer, ForeignKey("PLC.PLC_ID"))
     text_def_id:   Mapped[int]  = mapped_column(Integer, ForeignKey("TEXT_DEFINITION.TEXT_DEF_ID"))
     max_per_hour:  Mapped[int]  = mapped_column(Integer)
+
+
+class LongTermTrendSnapshot(Base):
+    __tablename__ = "long_term_trend_snapshot"
+
+    id:           Mapped[int]  = mapped_column(Integer, primary_key=True)
+    week_start:   Mapped[date] = mapped_column(DATE)
+    plc_id:       Mapped[int]  = mapped_column(Integer, ForeignKey("PLC.PLC_ID"))
+    text_def_id:  Mapped[int]  = mapped_column(Integer, ForeignKey("TEXT_DEFINITION.TEXT_DEF_ID"))
+    weekly_count: Mapped[int]  = mapped_column(Integer)

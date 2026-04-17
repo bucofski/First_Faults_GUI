@@ -5,8 +5,8 @@ from datetime import date, timedelta
 from sqlalchemy import delete, select
 
 from data.orm.reporting_orm import (
-    DailyHourSnapshot, DailyPlcSnapshot, MtbfSnapshot,
-    RepeatOffenderSnapshot, TopRiserSnapshot,
+    DailyHourSnapshot, DailyPlcSnapshot, LongTermTrendSnapshot,
+    MtbfSnapshot, RepeatOffenderSnapshot, TopRiserSnapshot,
 )
 from data.repositories.DB_Connection import get_session
 
@@ -280,6 +280,101 @@ class SnapshotRepository:
                 (plc_names.get(r.plc_id, str(r.plc_id)).strip(), r.avg_hours, r.fault_count)
                 for r in rows
             ]
+
+    def save_weekly_trend(
+        self,
+        rows: list[tuple[date, int, int, int]],  # (week_start, plc_id, text_def_id, count)
+    ) -> None:
+        if not rows:
+            return
+        week_starts = {r[0] for r in rows}
+        with get_session() as session:
+            for ws in week_starts:
+                session.execute(
+                    delete(LongTermTrendSnapshot)
+                    .where(LongTermTrendSnapshot.week_start == ws)
+                )
+            for week_start, plc_id, text_def_id, count in rows:
+                session.add(LongTermTrendSnapshot(
+                    week_start=week_start,
+                    plc_id=plc_id,
+                    text_def_id=text_def_id,
+                    weekly_count=count,
+                ))
+
+    def get_top_climbers(
+        self,
+        top_n: int = 10,
+    ) -> list[dict]:
+        """
+        Return top_n faults with the biggest absolute climb
+        (avg last 4 weeks − avg first 4 weeks).
+
+        Each entry: {mnemonic, plc_name, weeks: [(week_start, count), ...], climb}
+        """
+        with get_session() as session:
+            rows = session.execute(
+                select(
+                    LongTermTrendSnapshot.week_start,
+                    LongTermTrendSnapshot.plc_id,
+                    LongTermTrendSnapshot.text_def_id,
+                    LongTermTrendSnapshot.weekly_count,
+                ).order_by(LongTermTrendSnapshot.week_start)
+            ).all()
+
+            if not rows:
+                return []
+
+            from collections import defaultdict as _dd
+            series: dict[tuple, list] = _dd(list)
+            for r in rows:
+                series[(r.plc_id, r.text_def_id)].append((r.week_start, r.weekly_count))
+
+            from data.orm.reporting_orm import Plc, TextDefinition
+            all_plc_ids      = list({k[0] for k in series})
+            all_text_def_ids = list({k[1] for k in series})
+
+            plc_names = {
+                pid: name.strip() for pid, name in session.execute(
+                    select(Plc.plc_id, Plc.plc_name)
+                    .where(Plc.plc_id.in_(all_plc_ids))
+                ).all()
+            }
+            mnemonics = {
+                tid: m.strip() for tid, m in session.execute(
+                    select(TextDefinition.text_def_id, TextDefinition.mnemonic)
+                    .where(TextDefinition.text_def_id.in_(all_text_def_ids))
+                ).all()
+            }
+
+        results = []
+        for (plc_id, text_def_id), weekly in series.items():
+            if len(weekly) < 2:
+                continue
+            counts     = [c for _, c in weekly]
+            n          = max(1, len(counts) // 4)
+            first_avg  = sum(counts[:n])  / n
+            last_avg   = sum(counts[-n:]) / n
+            climb      = last_avg - first_avg
+            if climb <= 0:
+                continue
+            results.append({
+                "mnemonic": mnemonics.get(text_def_id, str(text_def_id)),
+                "plc_name": plc_names.get(plc_id, str(plc_id)),
+                "weeks":    weekly,
+                "climb":    round(climb, 2),
+            })
+
+        results.sort(key=lambda x: x["climb"], reverse=True)
+        return results[:top_n]
+
+    def cleanup_weekly_trend(self, keep_weeks: int = 52) -> None:
+        cutoff = date.today() - timedelta(weeks=keep_weeks)
+        with get_session() as session:
+            session.execute(
+                delete(LongTermTrendSnapshot)
+                .where(LongTermTrendSnapshot.week_start < cutoff)
+            )
 
     # ------------------------------------------------------------------
     # Cleanup

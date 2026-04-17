@@ -57,6 +57,15 @@ def run() -> None:
         except Exception as e:
             print(f"ERROR: {e}")
 
+    print("Backfilling weekly trend data ...")
+    try:
+        trend = service.get_weekly_trend_snapshot_data(weeks=52)
+        repo.save_weekly_trend(trend)
+        unique_weeks = len({r[0] for r in trend})
+        print(f"  {unique_weeks} weeks saved ({len(trend)} fault-week rows)")
+    except Exception as e:
+        print(f"  ERROR: {e}")
+
     print("Backfill complete.")
 
 

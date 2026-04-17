@@ -151,6 +151,43 @@ class DiagramService:
         return plot(fig, include_plotlyjs=False, output_type='div')
 
     @staticmethod
+    def long_term_trend_html(top_n: int = 10) -> str:
+        repo    = SnapshotRepository()
+        climbers = repo.get_top_climbers(top_n=top_n)
+
+        if not climbers:
+            return "<p>No trend data yet — run the daily snapshot job first.</p>"
+
+        fig = go.Figure()
+        for entry in climbers:
+            label  = f"{entry['mnemonic']} ({entry['plc_name']})"
+            weeks  = [str(w) for w, _ in entry['weeks']]
+            counts = [c       for _, c in entry['weeks']]
+            fig.add_trace(go.Scatter(
+                x=weeks,
+                y=counts,
+                mode='lines+markers',
+                name=label,
+                hovertemplate=(
+                    f"<b>{label}</b><br>"
+                    "Week: %{x}<br>"
+                    "Faults: %{y}<br>"
+                    f"Climb: +{entry['climb']:.1f}/week"
+                    "<extra></extra>"
+                ),
+            ))
+
+        fig.update_layout(
+            title=f"Top {top_n} climbing faults (weekly, last 52 weeks)",
+            xaxis_title="Week",
+            yaxis_title="Faults per week",
+            legend=dict(orientation='h', y=-0.3),
+            margin=dict(t=50, r=20, b=120, l=60),
+            height=500,
+        )
+        return plot(fig, include_plotlyjs=False, output_type='div')
+
+    @staticmethod
     def mtbf_html(days: int = 30) -> str:
         repo = SnapshotRepository()
         snapshot_date, rows = repo.get_latest_mtbf(days_window=days)

@@ -37,18 +37,22 @@ def run() -> None:
 
     mtbf     = service.get_mtbf_snapshot_data(days=MTBF_DAYS)
     repeats  = service.get_repeat_offenders_snapshot_data(days=MTBF_DAYS, top_n=10)
+    trend    = service.get_weekly_trend_snapshot_data(weeks=52)
 
     repo.save_daily_counts(reference_date, by_hour, by_plc)
     repo.save_top_risers(reference_date, RECENT_DAYS, BASELINE_DAYS, risers)
     repo.save_mtbf(reference_date, MTBF_DAYS, mtbf)
     repo.save_repeat_offenders(reference_date, MTBF_DAYS, repeats)
+    repo.save_weekly_trend(trend)
     repo.cleanup_old_snapshots()
+    repo.cleanup_weekly_trend()
 
     print(f"  hours saved   : {len(by_hour)}")
     print(f"  PLCs saved    : {len(by_plc)}")
     print(f"  risers saved  : {len(risers)}")
     print(f"  MTBF saved    : {len(mtbf)}")
     print(f"  repeats saved : {len(repeats)}")
+    print(f"  trend weeks   : {len({r[0] for r in trend})}")
     print("Done.")
 
 

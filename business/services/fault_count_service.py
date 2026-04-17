@@ -268,6 +268,36 @@ class FaultCountService:
         ]
         return sorted(results, key=lambda x: x[2], reverse=True)[:top_n]
 
+    def get_weekly_trend_snapshot_data(
+        self,
+        weeks: int = 52,
+    ) -> list[tuple[date, int, int, int]]:
+        """
+        Return (week_start_monday, plc_id, text_def_id, count) for all available weeks.
+        week_start is always Monday in Brussels local time.
+        Only fills weeks that have data — backfill may produce fewer than 52 weeks.
+        """
+        today      = datetime.now(tz=_BRUSSELS).date()
+        # go back `weeks` full weeks from last Monday
+        last_monday = today - timedelta(days=today.weekday())
+        start_date  = last_monday - timedelta(weeks=weeks)
+
+        rows = self._fetch_window(
+            self._date_to_utc(start_date),
+            self._date_to_utc(today),
+        )
+
+        bucket_counts: dict[tuple, int] = defaultdict(int)
+        for utc_dt, plc_id, text_def_id, _, _ in rows:
+            local_date = utc_dt.replace(tzinfo=timezone.utc).astimezone(_BRUSSELS).date()
+            week_start = local_date - timedelta(days=local_date.weekday())
+            bucket_counts[(week_start, plc_id, text_def_id)] += 1
+
+        return [
+            (week_start, plc_id, text_def_id, count)
+            for (week_start, plc_id, text_def_id), count in bucket_counts.items()
+        ]
+
     def get_mtbf_per_plc(self, days: int = 30) -> list[MtbfResult]:
         """Average hours between consecutive root-cause faults per PLC."""
         today     = datetime.now(tz=_BRUSSELS).date()

@@ -78,3 +78,14 @@ CREATE TABLE dbo.repeat_offender_snapshot (
     CONSTRAINT FK_repeat_text FOREIGN KEY (text_def_id) REFERENCES dbo.TEXT_DEFINITION(TEXT_DEF_ID),
     CONSTRAINT UQ_repeat      UNIQUE (snapshot_date, days_window, plc_id, text_def_id)
 );
+
+CREATE TABLE dbo.long_term_trend_snapshot (
+    id           INT  PRIMARY KEY IDENTITY(1,1),
+    week_start   DATE NOT NULL,
+    plc_id       INT  NOT NULL,
+    text_def_id  INT  NOT NULL,
+    weekly_count INT  NOT NULL,
+    CONSTRAINT FK_trend_plc  FOREIGN KEY (plc_id)      REFERENCES dbo.PLC(PLC_ID),
+    CONSTRAINT FK_trend_text FOREIGN KEY (text_def_id) REFERENCES dbo.TEXT_DEFINITION(TEXT_DEF_ID),
+    CONSTRAINT UQ_trend      UNIQUE (week_start, plc_id, text_def_id)
+);
