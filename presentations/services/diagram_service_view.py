@@ -6,11 +6,11 @@ from data.repositories.snapshot_repository import SnapshotRepository
 
 
 class DiagramService:
-    @staticmethod
-    def grouped_bar_chart_html():
-        repo = SnapshotRepository()
-        snapshot_date, rows = repo.get_latest_hour_snapshot()
+    _repo = SnapshotRepository()
+    _fc_service = FaultCountService()
 
+    def grouped_bar_chart_html(self):
+        snapshot_date, rows = self._repo.get_latest_hour_snapshot()
         if rows:
             hours  = [f"{h:02d}h" for h, _ in rows]
             values = [c            for _, c in rows]
@@ -39,11 +39,9 @@ class DiagramService:
         )
         return plot(fig, include_plotlyjs='cdn', output_type='div')
 
-    @staticmethod
-    def pie_chart_html():
-        repo = SnapshotRepository()
-        snapshot_date, rows = repo.get_latest_plc_snapshot()
 
+    def pie_chart_html(self):
+        snapshot_date, rows = self._repo.get_latest_plc_snapshot()
         if rows:
             labels = [plc   for plc, _ in rows]
             values = [count for _, count in rows]
@@ -67,14 +65,14 @@ class DiagramService:
         )
         return plot(fig, include_plotlyjs=False, output_type='div')
 
-    @staticmethod
-    def grouped_bar_chart_2_html(
+
+    def grouped_bar_chart_2_html(self,
         recent_days:   int = 7,
         baseline_days: int = 30,
         top_n:         int = 10,
     ) -> str:
-        repo = SnapshotRepository()
-        snapshot_date, rows = repo.get_latest_top_risers(recent_days, baseline_days, top_n)
+
+        snapshot_date, rows = self._repo.get_latest_top_risers(recent_days, baseline_days, top_n)
 
         if rows:
             labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
@@ -114,10 +112,10 @@ class DiagramService:
         )
         return plot(fig, include_plotlyjs=False, output_type='div')
 
-    @staticmethod
-    def repeat_offenders_html(days: int = 30, top_n: int = 10) -> str:
-        repo = SnapshotRepository()
-        snapshot_date, rows = repo.get_latest_repeat_offenders(days_window=days, top_n=top_n)
+
+    def repeat_offenders_html(self,days: int = 30, top_n: int = 10) -> str:
+
+        snapshot_date, rows = self._repo.get_latest_repeat_offenders(days_window=days, top_n=top_n)
 
         if rows:
             labels = [f"{mnemonic} ({plc})" for mnemonic, plc, _ in rows]
@@ -151,9 +149,9 @@ class DiagramService:
         return plot(fig, include_plotlyjs=False, output_type='div')
 
     @staticmethod
-    def long_term_trend_html(top_n: int = 10) -> str:
-        repo    = SnapshotRepository()
-        climbers = repo.get_top_climbers(top_n=top_n)
+    def long_term_trend_html(self,top_n: int = 10) -> str:
+
+        climbers = self._repo.get_top_climbers(top_n=top_n)
 
         if not climbers:
             return "<p>No trend data yet — run the daily snapshot job first.</p>"
@@ -187,10 +185,10 @@ class DiagramService:
         )
         return plot(fig, include_plotlyjs=False, output_type='div')
 
-    @staticmethod
-    def mtbf_html(days: int = 30) -> str:
+
+    def mtbf_html(self,days: int = 30) -> str:
         repo = SnapshotRepository()
-        snapshot_date, rows = repo.get_latest_mtbf(days_window=days)
+        snapshot_date, rows = self._repo.get_latest_mtbf(days_window=days)
 
         if rows:
             plcs        = [r[0] for r in rows]
@@ -227,9 +225,9 @@ class DiagramService:
         )
         return plot(fig, include_plotlyjs=False, output_type='div')
 
-    @staticmethod
-    def heatmap_html(plc_name: str, days: int = 30) -> str:
-        data = FaultCountService().get_heatmap_data(plc_name=plc_name, days=days)
+
+    def heatmap_html(self,plc_name: str, days: int = 30) -> str:
+        data = self._fc_service.get_heatmap_data(plc_name=plc_name, days=days)
 
         fig = go.Figure(data=go.Heatmap(
             z=data.counts,

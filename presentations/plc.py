@@ -1,4 +1,3 @@
-from typing import List
 import datetime as dt
 
 from flask import (
@@ -12,13 +11,15 @@ from flask import (
 )
 
 from business.services.analyzer import InterlockService
-from business.services.diagram_service_view import DiagramService
+from presentations.services.diagram_service_view import DiagramService
 from business.services.fault_count_service import FaultCountService
 
 from presentations.services.pdf_generator import PdfGenerator
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 service_interlock = InterlockService()
+_diagram_service = DiagramService()
+_fault_count_service = FaultCountService()
 
 
 def _parse_iso_datetime(value: str | None, field_name: str) -> dt.datetime | None:
@@ -132,12 +133,12 @@ def contact():
 @bp.route("/diagrams")
 def diagrams():
     selected_plc = request.args.get("plc", "").strip() or None
-    plc_names    = FaultCountService.get_all_plc_names()
+    plc_names    = _fault_count_service.get_all_plc_names()
 
-    chart_html  = DiagramService.grouped_bar_chart_html()
-    chart_html2 = DiagramService.grouped_bar_chart_2_html()
-    pie_html    = DiagramService.pie_chart_html()
-    heatmap     = DiagramService.heatmap_html(selected_plc) if selected_plc else ""
+    chart_html  = _diagram_service.grouped_bar_chart_html()
+    chart_html2 = _diagram_service.grouped_bar_chart_2_html()
+    pie_html    = _diagram_service.pie_chart_html()
+    heatmap     = _diagram_service.heatmap_html(selected_plc) if selected_plc else ""
 
     return render_template(
         "diagrams.html",
