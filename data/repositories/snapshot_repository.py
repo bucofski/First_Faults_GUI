@@ -1,8 +1,11 @@
 """Save and read pre-computed fault count snapshots."""
 
+import logging
 from datetime import date, timedelta
 
 from sqlalchemy import delete, select
+
+logger = logging.getLogger(__name__)
 
 from data.orm.reporting_orm import (
     DailyHourSnapshot, DailyPlcSnapshot, LongTermTrendSnapshot,

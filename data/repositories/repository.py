@@ -1,11 +1,14 @@
 """Repository for interlock data access."""
 
+import logging
 from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import func, select
 
 from data.repositories.DB_Connection import get_session
+
+logger = logging.getLogger(__name__)
 
 
 class InterlockRepository:
