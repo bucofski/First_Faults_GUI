@@ -130,15 +130,48 @@ def contact():
     return render_template("contact.html", title="Contact")
 
 
+def _first_monday_of_month_week(year: int, month: int, week: int) -> dt.date:
+    """Return the Monday of the *week*-th week in the given month.
+
+    Week 1 contains the first Monday that falls in (or starts) the month.
+    If the requested week overshoots the month, the last valid Monday is
+    returned instead.
+    """
+    # Find the first Monday on or after the 1st of the month
+    first_day = dt.date(year, month, 1)
+    days_until_monday = (7 - first_day.weekday()) % 7  # 0 if already Monday
+    first_monday = first_day + dt.timedelta(days=days_until_monday)
+    target = first_monday + dt.timedelta(weeks=week - 1)
+    # Clamp to the same month
+    last_day = (first_day.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
+    if target > last_day:
+        target = first_monday + dt.timedelta(weeks=max(0, (last_day - first_monday).days // 7))
+    return target
+
+
 @bp.route("/diagrams")
 def diagrams():
     selected_plc = request.args.get("plc", "").strip() or None
     plc_names    = _fault_count_service.get_all_plc_names()
 
-    chart_html  = _diagram_service.grouped_bar_chart_html()
-    chart_html2 = _diagram_service.grouped_bar_chart_2_html()
-    pie_html    = _diagram_service.pie_chart_html()
+    # --- month / week selection ---
+    now = dt.date.today()
+    selected_month = request.args.get("month", type=int, default=now.month)
+    selected_week  = request.args.get("week",  type=int, default=1)
+    selected_year  = now.year  # always current year for now
+
+    selected_date = _first_monday_of_month_week(selected_year, selected_month, selected_week)
+
+    # Build month options list
+    months = [(m, dt.date(selected_year, m, 1).strftime("%B")) for m in range(1, 13)]
+
+    chart_html  = _diagram_service.grouped_bar_chart_html(reference_date=selected_date)
+    chart_html2 = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
+    pie_html    = _diagram_service.pie_chart_html(reference_date=selected_date)
     heatmap     = _diagram_service.heatmap_html(selected_plc) if selected_plc else ""
+    mtbf_html   = _diagram_service.mtbf_html(reference_date=selected_date)
+    long_html   = _diagram_service.long_term_trend_html()
+    repeat_offender = _diagram_service.repeat_offenders_html(reference_date=selected_date)
 
     return render_template(
         "diagrams.html",
@@ -149,6 +182,13 @@ def diagrams():
         heatmap_html=heatmap,
         plc_names=plc_names,
         selected_plc=selected_plc,
+        mtbf_html=mtbf_html,
+        long_html=long_html,
+        repeat_offender=repeat_offender,
+        months=months,
+        selected_month=selected_month,
+        selected_week=selected_week,
+        selected_date=selected_date.isoformat(),
     )
 
 

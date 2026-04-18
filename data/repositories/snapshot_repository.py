@@ -94,12 +94,14 @@ class SnapshotRepository:
     # Read
     # ------------------------------------------------------------------
 
-    def get_latest_hour_snapshot(self) -> tuple[date | None, list[tuple[int, int]]]:
-        """Return (snapshot_date, [(hour, count), ...]) for the most recent date."""
+    def get_latest_hour_snapshot(self, reference_date: date | None = None) -> tuple[date | None, list[tuple[int, int]]]:
+        """Return (snapshot_date, [(hour, count), ...]) for the most recent date on or before *reference_date*."""
         with get_session() as session:
+            q = select(DailyHourSnapshot.snapshot_date)
+            if reference_date is not None:
+                q = q.where(DailyHourSnapshot.snapshot_date <= reference_date)
             latest = session.execute(
-                select(DailyHourSnapshot.snapshot_date)
-                .order_by(DailyHourSnapshot.snapshot_date.desc())
+                q.order_by(DailyHourSnapshot.snapshot_date.desc())
                 .limit(1)
             ).scalar_one_or_none()
 
@@ -113,12 +115,14 @@ class SnapshotRepository:
             ).all()
             return latest, [(r.hour, r.fault_count) for r in rows]
 
-    def get_latest_plc_snapshot(self) -> tuple[date | None, list[tuple[str, int]]]:
+    def get_latest_plc_snapshot(self, reference_date: date | None = None) -> tuple[date | None, list[tuple[str, int]]]:
         """Return (snapshot_date, [(plc_name, count), ...]) sorted descending."""
         with get_session() as session:
+            q = select(DailyPlcSnapshot.snapshot_date)
+            if reference_date is not None:
+                q = q.where(DailyPlcSnapshot.snapshot_date <= reference_date)
             latest = session.execute(
-                select(DailyPlcSnapshot.snapshot_date)
-                .order_by(DailyPlcSnapshot.snapshot_date.desc())
+                q.order_by(DailyPlcSnapshot.snapshot_date.desc())
                 .limit(1)
             ).scalar_one_or_none()
 
@@ -137,14 +141,19 @@ class SnapshotRepository:
         recent_days:   int = 7,
         baseline_days: int = 30,
         top_n:         int = 10,
+        reference_date: date | None = None,
     ) -> tuple[date | None, list]:
-        """Return (snapshot_date, [TopRiserSnapshot, ...]) for the most recent date."""
+        """Return (snapshot_date, [TopRiserSnapshot, ...]) for the most recent date on or before *reference_date*."""
         with get_session() as session:
-            latest = session.execute(
+            q = (
                 select(TopRiserSnapshot.snapshot_date)
                 .where(TopRiserSnapshot.recent_days   == recent_days)
                 .where(TopRiserSnapshot.baseline_days == baseline_days)
-                .order_by(TopRiserSnapshot.snapshot_date.desc())
+            )
+            if reference_date is not None:
+                q = q.where(TopRiserSnapshot.snapshot_date <= reference_date)
+            latest = session.execute(
+                q.order_by(TopRiserSnapshot.snapshot_date.desc())
                 .limit(1)
             ).scalar_one_or_none()
 
@@ -196,13 +205,18 @@ class SnapshotRepository:
         self,
         days_window: int = 30,
         top_n:       int = 10,
+        reference_date: date | None = None,
     ) -> tuple[date | None, list[tuple[str, str, int]]]:
         """Return (snapshot_date, [(mnemonic, plc_name, max_per_hour), ...])."""
         with get_session() as session:
-            latest = session.execute(
+            q = (
                 select(RepeatOffenderSnapshot.snapshot_date)
                 .where(RepeatOffenderSnapshot.days_window == days_window)
-                .order_by(RepeatOffenderSnapshot.snapshot_date.desc())
+            )
+            if reference_date is not None:
+                q = q.where(RepeatOffenderSnapshot.snapshot_date <= reference_date)
+            latest = session.execute(
+                q.order_by(RepeatOffenderSnapshot.snapshot_date.desc())
                 .limit(1)
             ).scalar_one_or_none()
 
@@ -247,14 +261,18 @@ class SnapshotRepository:
             ]
 
     def get_latest_mtbf(
-        self, days_window: int = 30
+        self, days_window: int = 30, reference_date: date | None = None,
     ) -> tuple[date | None, list[tuple[str, float, int]]]:
         """Return (snapshot_date, [(plc_name, avg_hours, fault_count), ...]) ascending by avg_hours."""
         with get_session() as session:
-            latest = session.execute(
+            q = (
                 select(MtbfSnapshot.snapshot_date)
                 .where(MtbfSnapshot.days_window == days_window)
-                .order_by(MtbfSnapshot.snapshot_date.desc())
+            )
+            if reference_date is not None:
+                q = q.where(MtbfSnapshot.snapshot_date <= reference_date)
+            latest = session.execute(
+                q.order_by(MtbfSnapshot.snapshot_date.desc())
                 .limit(1)
             ).scalar_one_or_none()
 
