@@ -1,71 +1,51 @@
-#"""
-#Weekly Snapshot Script
-#Run this every Monday (or any schedule you prefer) to track fault trends over time.
+"""
+Weekly Snapshot Script
+======================
+Runs the fault trend analysis and saves the results to the database.
 
-#Schedule with cron (Linux/Mac):
-#    0 9 * * 1 /path/to/python /path/to/run_weekly_snapshot.py
+Schedule with cron (Linux/Mac):
+    0 9 * * 1 /path/to/python /path/to/run_weekly_snapshot.py
 
-#Schedule with Task Scheduler (Windows):
-#    - Create Basic Task
-#    - Set weekly trigger for Monday 9:00 AM
-#    - Action: Start a program
-#    - Program: python.exe
-#    - Arguments: C:\path\to\run_weekly_snapshot.py
-#"""
+Schedule with Task Scheduler (Windows):
+    Program : python.exe
+    Arguments: C:\\path\\to\\run_weekly_snapshot.py
+"""
 
-from ml_pipeline import load_interlock_data, prepare_features
-from fault_analyzer import PatternAnalyzer
-from snapshot_manager import TrendSnapshotManager
 from datetime import datetime
 
+from business.services.reporting_service import ReportingService
+from data.orm.trend_orm import init_trend_tables
 
-def main():
+
+def main() -> None:
     print(f"\n{'=' * 60}")
-    print(f"Running Weekly Snapshot - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Weekly Snapshot — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'=' * 60}\n")
 
-    try:
-        # Load data
-        print("Loading interlock data...")
-        df = load_interlock_data(top_n=100000)
-        df = prepare_features(df)
-        print(f"✓ Loaded {len(df)} records")
+    # Ensure trend tables exist
+    init_trend_tables()
 
-        # Analyze (root causes only)
-        print("\nAnalyzing fault patterns...")
-        analyzer = PatternAnalyzer(df, root_cause_only=True)
+    service = ReportingService()
 
-        # Save snapshot
-        print("\nSaving snapshot to database...")
-        snapshot_mgr = TrendSnapshotManager()
-        snapshot_mgr.save_snapshot(
-            analyzer,
-            days_recent=7,
-            days_previous=30
-        )
+    print("Loading data and running analysis...")
+    result = service.analyze_and_save(days_recent=7, days_previous=30, top_n=50)
 
-        # Show summary
-        print("\n" + "=" * 60)
-        print("SNAPSHOT SUMMARY")
-        print("=" * 60)
+    print(f"\nAnalysis period:")
+    print(f"  Recent   : {result.period_recent}")
+    print(f"  Previous : {result.period_previous}")
+    print(f"  Faults (recent / previous): {result.total_faults_recent} / {result.total_faults_previous}")
 
-        result = analyzer.top_risers_with_context(days_recent=7, days_previous=30, top_n=10)
-        print(f"\nPeriods analyzed:")
-        print(f"  Recent:   {result['analysis_period']['recent']}")
-        print(f"  Previous: {result['analysis_period']['previous']}")
-        print(f"\nTop 10 Rising Faults:")
-        print(result['risers_df'][['Rank', 'Condition', 'Recent_Count', 'Change_%', 'Confidence_Score']].to_string(
-            index=False))
+    print(f"\nTop 10 Rising Faults:")
+    header = f"  {'Rank':>4}  {'Condition':<30}  {'PLC':<15}  {'Change':>8}  {'Confidence':>10}"
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for r in result.top_risers[:10]:
+        change = f"{r.change_percent}%" if r.change_percent != "NEW" else "NEW"
+        print(f"  {r.rank:>4}  {r.condition:<30}  {r.plc:<15}  {change:>8}  {r.confidence_score:>10.1f}")
 
-        print("\n" + "=" * 60)
-        print("✓ Weekly snapshot completed successfully!")
-        print("=" * 60 + "\n")
-
-    except Exception as e:
-        print(f"\n❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise
+    print(f"\n{'=' * 60}")
+    print("Snapshot completed successfully.")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

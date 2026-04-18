@@ -1,102 +1,68 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ title or "Interlock Tree" }}</h1>
+
+<!-- Top bar -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">{{ title or "Interlock Tree" }}</h2>
+    <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()">&#x21bb; Refresh</button>
+</div>
 
 {% for message in messages %}
-<div class="alert alert-error">{{ message }}</div>
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
 {% endfor %}
 
-<form method="POST" action="{{ url_for('plc.table_tree') }}" class="bsid-form" id="bsid-form">
-    <div class="form-row">
-        <div class="form-group">
-            <label for="target_bsid">Target BSID:</label>
-            <input type="number"
-                   id="target_bsid"
-                   name="target_bsid"
-                   value="{{ target_bsid or '' }}"
-                   placeholder="Enter BSID"
-                   class="form-control">
+<!-- Filter form -->
+<form method="POST" action="{{ url_for('plc.table_tree') }}" class="card card-body bg-light mb-4" id="bsid-form">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-2 col-sm-4">
+            <label for="target_bsid" class="form-label fw-bold">Target BSID</label>
+            <input type="number" id="target_bsid" name="target_bsid"
+                   value="{{ target_bsid or '' }}" placeholder="Enter BSID" class="form-control">
         </div>
-        <div class="form-group">
-            <label for="top_n">Top N:</label>
-            <input type="number"
-                   id="top_n"
-                   name="top_n"
-                   value="{{ top_n or '' }}"
-                   placeholder="Limit"
-                   class="form-control">
+        <div class="col-md-2 col-sm-4">
+            <label for="top_n" class="form-label fw-bold">Top N</label>
+            <input type="number" id="top_n" name="top_n"
+                   value="{{ top_n or '' }}" placeholder="Limit" class="form-control">
         </div>
-        <div class="form-group">
-            <label for="filter_plc">PLC Filter:</label>
-            <input type="text"
-                   id="filter_plc"
-                   name="filter_plc"
-                   value="{{ filter_plc or '' }}"
-                   placeholder="PLC Name"
-                   class="form-control">
+        <div class="col-md-2 col-sm-4">
+            <label for="filter_plc" class="form-label fw-bold">PLC Filter</label>
+            <input type="text" id="filter_plc" name="filter_plc"
+                   value="{{ filter_plc or '' }}" placeholder="PLC Name" class="form-control">
         </div>
-
-    </div>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label for="filter_timestamp_start">Start Time:</label>
-            <input type="datetime-local"
-                   id="filter_timestamp_start"
-                   name="filter_timestamp_start"
-                   value="{{ filter_timestamp_start or '' }}"
-                   class="form-control">
+        <div class="col-md-3 col-sm-6">
+            <label for="filter_timestamp_start" class="form-label fw-bold">Start Time</label>
+            <input type="datetime-local" id="filter_timestamp_start" name="filter_timestamp_start"
+                   value="{{ filter_timestamp_start or '' }}" class="form-control">
         </div>
-        <div class="form-group">
-            <label for="filter_timestamp_end">End Time:</label>
-            <input type="datetime-local"
-                   id="filter_timestamp_end"
-                   name="filter_timestamp_end"
-                   value="{{ filter_timestamp_end or '' }}"
-                   class="form-control">
-        </div>
-
-
-    </div>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label for="filter_condition_message">Condition Message:</label>
-            <input type="text"
-                   id="filter_condition_message"
-                   name="filter_condition_message"
-                   value="{{ filter_condition_message or '' }}"
-                   placeholder="Filter message..."
-                   class="form-control"
-                  >
-
+        <div class="col-md-3 col-sm-6">
+            <label for="filter_timestamp_end" class="form-label fw-bold">End Time</label>
+            <input type="datetime-local" id="filter_timestamp_end" name="filter_timestamp_end"
+                   value="{{ filter_timestamp_end or '' }}" class="form-control">
         </div>
     </div>
-
-    <div class="form-row">
-        <button type="submit" class="btn btn-primary" id="submit-btn">Load</button>
-
-        <button type="button"
-                class="btn btn-secondary"
-                id="pdf-btn"
-                data-pdf-url="{{ url_for('plc.table_tree_export') }}">
-            Pdf
-        </button>
-
-        <button type="button" class="btn btn-secondary" id="reset-btn">Reset</button>
+    <div class="row g-3 align-items-end mt-1">
+        <div class="col-md-4">
+            <label for="filter_condition_message" class="form-label fw-bold">Condition Message</label>
+            <input type="text" id="filter_condition_message" name="filter_condition_message"
+                   value="{{ filter_condition_message or '' }}" placeholder="Filter message..." class="form-control">
+        </div>
+        <div class="col-auto d-flex gap-2">
+            <button type="submit" class="btn btn-primary" id="submit-btn">Load</button>
+            <button type="button" class="btn btn-outline-success" id="pdf-btn"
+                    data-pdf-url="{{ url_for('plc.table_tree_export') }}">PDF</button>
+            <button type="button" class="btn btn-outline-secondary" id="reset-btn">Reset</button>
+        </div>
     </div>
 </form>
 
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loading-overlay">
-    <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <p>Loading data...</p>
-    </div>
-</div>
-
+<!-- Results -->
 {% if target_bsid %}
-<p><strong>Showing results for BSID:</strong> {{ target_bsid }}</p>
+<div class="mb-3">
+    <span class="badge bg-info text-dark">Showing results for BSID: {{ target_bsid }}</span>
+</div>
 {% endif %}
 
 {% if items %}
@@ -106,32 +72,25 @@
     {% if depth > 0 %}style="display:none;"{% endif %}>
     <td style="padding-left: {{ 20 + depth * 30 }}px;">
         {% if node.children %}
-        <span class="toggle" data-target="{{ node.interlock_log_id }}-{{ depth }}">▶</span>
+        <span class="toggle" data-target="{{ node.interlock_log_id }}-{{ depth }}">&#x25b6;</span>
         {% else %}
-        <span style="opacity:0.3; margin-right: 6px;">•</span>
+        <span class="tree-leaf">&#x2022;</span>
         {% endif %}
         <strong>Level {{ node.level }}</strong> - {{ node.interlock_message or 'N/A' }}
     </td>
     <td>{{ node.bsid or 'N/A' }}</td>
     <td>{{ node.plc or 'N/A' }}</td>
     <td>{{ node.direction or 'N/A' }}</td>
-    <td>{{ node.timestamp or 'N/A' }}</td>
-    <td>
-        <span class="status-badge status-{{ (node.status or 'unknown')|lower }}">
-            {{ node.status or 'Unknown' }}
-        </span>
-    </td>
+    <td class="text-nowrap">{{ node.timestamp or 'N/A' }}</td>
     <td>
         {% if node.conditions %}
-        <ul class="conditions-list">
+        <ul class="conditions-list mb-0">
             {% for cond in node.conditions %}
-            <li>bit index :{{ cond.bit_index }}</li>
-            <li>msg :{{ cond.message }}</li>
-                <br/>
+            <li><small><strong>bit {{ cond.bit_index }}:</strong> {{ cond.message }}</small></li>
             {% endfor %}
         </ul>
         {% else %}
-        -
+        <span class="text-muted">-</span>
         {% endif %}
     </td>
 </tr>
@@ -140,240 +99,84 @@
 {% endfor %}
 {% endmacro %}
 
-<table class="table" id="treegrid">
-    <thead>
-    <tr>
-        <th>Interlock Message</th>
-        <th>BSID</th>
-        <th>PLC</th>
-        <th>Direction</th>
-        <th>Timestamp</th>
-        <th>Status</th>
-        <th>Conditions</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for item in items %}
-    {{ render_node(item, 'root-' ~ loop.index, 0) }}
-    {% endfor %}
-    </tbody>
-</table>
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0" id="treegrid">
+                <thead class="table-dark">
+                <tr>
+                    <th>Interlock Message</th>
+                    <th>BSID</th>
+                    <th>PLC</th>
+                    <th>Direction</th>
+                    <th>Timestamp</th>
+                    <th>Conditions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in items %}
+                {{ render_node(item, 'root-' ~ loop.index, 0) }}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% elif target_bsid %}
-<p class="no-results">No interlock data found for BSID {{ target_bsid }}.</p>
+<div class="card card-body text-center text-muted py-5">
+    No interlock data found for BSID {{ target_bsid }}.
+</div>
 {% else %}
-<p class="no-results">Enter a Target BSID to load interlock data.</p>
+<div class="card card-body text-center text-muted py-5">
+    Enter a Target BSID to load interlock data.
+</div>
 {% endif %}
 
 <style>
-    .bsid-form {
-        margin-bottom: 20px;
-        padding: 15px;
-        background: #f9f9f9;
-        border-radius: 4px;
-    }
-
-    .bsid-form .form-row {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-    }
-
-    .bsid-form .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-
-    .bsid-form .form-group.full-width {
-        width: 100%;
-        flex: 1 1 100%;
-    }
-
-    .bsid-form label {
-        font-weight: 500;
-        font-size: 0.9em;
-    }
-
-    .bsid-form input {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        min-width: 150px;
-    }
-
-    .bsid-form .form-control {
-        width: 100%; /* Ensure input takes container width */
-        box-sizing: border-box;
-    }
-
-    .bsid-form button {
-        padding: 8px 16px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        align-self: flex-start;
-    }
-
-    .bsid-form button:hover {
-        background: #0056b3;
-    }
-
-    .bsid-form button:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
-    }
-
-    /* Loading Overlay Styles */
-    .loading-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 9999;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .loading-overlay.active {
-        display: flex;
-    }
-
-    .loading-content {
-        background: white;
-        padding: 40px 60px;
-        border-radius: 12px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    }
-
-    .loading-spinner {
-        width: 80px;
-        height: 80px;
-        border: 8px solid #e0e0e0;
-        border-top: 8px solid #007bff;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 20px auto;
-    }
-
-    .loading-content p {
-        margin: 0;
-        font-size: 18px;
-        color: #333;
-        font-weight: 500;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .alert-error {
-        padding: 10px;
-        background: #f8d7da;
-        color: #721c24;
-        border-radius: 4px;
-        margin-bottom: 15px;
-    }
-
-    .no-results {
-        color: #666;
-        font-style: italic;
-    }
-
-    .table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .table th, .table td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        vertical-align: top;
-    }
-
-    .table th {
-        background: #f5f5f5;
-        text-align: left;
-    }
-
     .toggle {
         cursor: pointer;
         user-select: none;
         margin-right: 6px;
         font-size: 10px;
+        color: #007bff;
     }
-
-    tr.child {
-        background: #fafafa;
+    .toggle:hover {
+        color: #0056b3;
     }
-
+    .tree-leaf {
+        opacity: 0.3;
+        margin-right: 6px;
+    }
     tr.child td:first-child {
         border-left: 3px solid #007bff;
     }
-
     .conditions-list {
-        margin: 0;
         padding-left: 16px;
         font-size: 0.85em;
+        list-style: none;
     }
-
     .conditions-list li {
         margin-bottom: 2px;
-    }
-
-    .status-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.85em;
-        font-weight: 500;
-    }
-
-    .status-badge.status-active {
-        background: #d4edda;
-        color: #155724;
-    }
-
-    .status-badge.status-inactive {
-        background: #f8d7da;
-        color: #721c24;
-    }
-
-    .status-badge.status-unknown {
-        background: #e2e3e5;
-        color: #383d41;
     }
 </style>
 
 <script>
     const form = document.getElementById("bsid-form");
-    const overlay = document.getElementById("loading-overlay");
+    const overlay = document.getElementById("global-loading-overlay");
     const loadBtn = document.getElementById("submit-btn");
     const pdfBtn = document.getElementById("pdf-btn");
 
-    // Show overlay only for "Load" (normal form submit)
     form.addEventListener("submit", function () {
-        overlay.classList.add("active");
         loadBtn.disabled = true;
     });
 
-    // PDF download via fetch -> always disable overlay when response arrives
     pdfBtn.addEventListener("click", async function () {
         const pdfUrl = pdfBtn.dataset.pdfUrl;
-
         overlay.classList.add("active");
         pdfBtn.disabled = true;
 
         try {
             const fd = new FormData(form);
-
             const resp = await fetch(pdfUrl, {
                 method: "POST",
                 body: fd,
@@ -386,12 +189,10 @@
             }
 
             const blob = await resp.blob();
-
             const objectUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = objectUrl;
 
-            // Try to honor filename from server; fallback if missing
             const cd = resp.headers.get("Content-Disposition") || "";
             const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i);
             a.download = m ? decodeURIComponent(m[1]) : "table_tree_export.pdf";
@@ -420,19 +221,18 @@
         if (!t) return;
         const id = t.getAttribute("data-target");
         const rows = document.querySelectorAll(".child-of-" + CSS.escape(id));
-        const isOpen = t.textContent.trim() === "▼";
+        const isOpen = t.textContent.trim() === "\u25bc";
 
         rows.forEach(r => {
             r.style.display = isOpen ? "none" : "";
-            // Collapse nested children when parent is collapsed
             if (isOpen) {
                 const nestedToggle = r.querySelector(".toggle");
-                if (nestedToggle && nestedToggle.textContent.trim() === "▼") {
+                if (nestedToggle && nestedToggle.textContent.trim() === "\u25bc") {
                     nestedToggle.click();
                 }
             }
         });
-        t.textContent = isOpen ? "▶" : "▼";
+        t.textContent = isOpen ? "\u25b6" : "\u25bc";
     });
 </script>
 {% endblock %}

@@ -4,11 +4,12 @@ from fault_analyzer import PatternAnalyzer, InterlockPredictor
 from snapshot_manager import TrendSnapshotManager
 
 # Load data
-df = load_interlock_data(top_n=100000)
+df = load_interlock_data(top_n=10000)
 df = prepare_features(df)
+df = df.loc[df.groupby('Interlock_Log_ID')['Level'].idxmax()]
 
 # === Pattern Analysis ===
-analyzer = PatternAnalyzer(df)
+analyzer = PatternAnalyzer(df, root_cause_only=False)
 
 print("=== Most Frequent Faults ===")
 print(analyzer.most_frequent_faults(10))

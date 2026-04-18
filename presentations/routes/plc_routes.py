@@ -1,4 +1,3 @@
-from typing import List
 import datetime as dt
 
 from flask import (
@@ -12,12 +11,17 @@ from flask import (
 )
 
 from business.services.analyzer import InterlockService
-from business.services.diagram_service_view import DiagramService
+from presentations.services.diagram_service_view import DiagramService
+from business.core.fault_count_service import FaultCountService
 
 from presentations.services.pdf_generator import PdfGenerator
+from presentations.services.diagram_pdf_service import DiagramPdfService
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 service_interlock = InterlockService()
+_diagram_service = DiagramService()
+_diagram_pdf_service = DiagramPdfService()
+_fault_count_service = FaultCountService()
 
 
 def _parse_iso_datetime(value: str | None, field_name: str) -> dt.datetime | None:
@@ -128,17 +132,81 @@ def contact():
     return render_template("contact.html", title="Contact")
 
 
+def _first_monday_of_month_week(year: int, month: int, week: int) -> dt.date:
+    """Return the Monday of the *week*-th week in the given month.
+
+    Week 1 contains the first Monday that falls in (or starts) the month.
+    If the requested week overshoots the month, the last valid Monday is
+    returned instead.
+    """
+    # Find the first Monday on or after the 1st of the month
+    first_day = dt.date(year, month, 1)
+    days_until_monday = (7 - first_day.weekday()) % 7  # 0 if already Monday
+    first_monday = first_day + dt.timedelta(days=days_until_monday)
+    target = first_monday + dt.timedelta(weeks=week - 1)
+    # Clamp to the same month
+    last_day = (first_day.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
+    if target > last_day:
+        target = first_monday + dt.timedelta(weeks=max(0, (last_day - first_monday).days // 7))
+    return target
+
+
 @bp.route("/diagrams")
 def diagrams():
-    chart_html = DiagramService.grouped_bar_chart_html()
-    chart_html2 = DiagramService.grouped_bar_chart_2_html()
-    pie_html = DiagramService.pie_chart_html()
+    selected_plc = request.args.get("plc", "").strip() or None
+    plc_names    = _fault_count_service.get_all_plc_names()
+
+    # --- month / week selection ---
+    now = dt.date.today()
+    selected_month = request.args.get("month", type=int, default=now.month)
+    selected_week  = request.args.get("week",  type=int, default=1)
+    selected_year  = now.year  # always current year for now
+
+    selected_date = _first_monday_of_month_week(selected_year, selected_month, selected_week)
+
+    # Build month options list
+    months = [(m, dt.date(selected_year, m, 1).strftime("%B")) for m in range(1, 13)]
+
+    chart_html      = _diagram_service.grouped_bar_chart_html(reference_date=selected_date)
+    chart_html2     = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
+    pie_html        = _diagram_service.pie_chart_html(reference_date=selected_date)
+    heatmap         = _diagram_service.heatmap_html(selected_plc) if selected_plc else ""
+    mtbf_html       = _diagram_service.mtbf_html(reference_date=selected_date)
+    long_html       = _diagram_service.long_term_trend_html()
+    repeat_offender = _diagram_service.repeat_offenders_html(reference_date=selected_date)
+
     return render_template(
         "diagrams.html",
         title="Diagrams",
         chart_html=chart_html,
         chart_2_html=chart_html2,
         pie_html=pie_html,
+        heatmap_html=heatmap,
+        plc_names=plc_names,
+        selected_plc=selected_plc,
+        mtbf_html=mtbf_html,
+        long_html=long_html,
+        repeat_offender=repeat_offender,
+        months=months,
+        selected_month=selected_month,
+        selected_week=selected_week,
+        selected_date=selected_date.isoformat(),
+    )
+
+
+@bp.route("/diagrams-pdf")
+def diagrams_pdf():
+    now = dt.date.today()
+    selected_month = request.args.get("month", type=int, default=now.month)
+    selected_week = request.args.get("week", type=int, default=1)
+    selected_date = _first_monday_of_month_week(now.year, selected_month, selected_week)
+
+    buf = _diagram_pdf_service.generate_pdf(reference_date=selected_date)
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"diagrams_{selected_date.isoformat()}.pdf",
     )
 
 
@@ -220,52 +288,3 @@ def table_tree():
         filter_condition_message=filter_condition_message,
         filter_plc=filter_plc,
     )
-
-
-@bp.route("/form", methods=["GET", "POST"])
-def form():
-    if request.method == "POST":
-        # Read fields
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
-        age = request.form.get("age", "").strip()
-        topic = request.form.get("topic", "")
-        message = request.form.get("message", "").strip()
-
-        # Basic validation (expand as you like)
-        errors = []
-        if not name:
-            errors.append("Name is required.")
-        if email and "@" not in email:
-            errors.append("Email looks invalid.")
-        if age:
-            try:
-                age_val = int(age)
-                if age_val < 0 or age_val > 120:
-                    errors.append("Age must be between 0 and 120.")
-            except ValueError:
-                errors.append("Age must be a number.")
-        # if errors, flash them and redirect back (PRG)
-        if errors:
-            for e in errors:
-                flash(e, "error")
-            # preserve minimal form data by flashing a dict (or use session)
-            flash(
-                f"Form submitted successfully: Name - {name}, Email - {email}, Age - {age}, Topic - {topic}, Message - {message}",
-                "success")
-            return redirect(url_for("form"))
-
-        # No errors → process (store/send/etc). Here we just flash the result.
-        flash("Form submitted successfully.", "success")
-        flash(
-            f"Form submitted successfully: Name - {name}, Email - {email}, Age - {age}, Topic - {topic}, Message - {message}",
-            "form-data")
-        return redirect(url_for("plc.form"))
-
-    # GET: render the form and pick up flashed data/messages
-    flashed = get_flashed_messages(with_categories=True)
-    # separate messages and form-data
-    messages = [m for cat, m in flashed if cat in ("error", "success")]
-    form_data_items = [m for cat, m in flashed if cat == "form-data"]
-    form_data = form_data_items[0] if form_data_items else {}
-    return render_template("form.html", title="Form", messages=messages, form_data=form_data)

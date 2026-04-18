@@ -16,32 +16,17 @@ class InterlockTreeBuilder:
 
         trees = []
 
-        for date, date_group in df.groupby("Date"):
-            chains = InterlockTreeBuilder._extract_chains(date_group)
-            for chain_df in chains:
-                root = InterlockTreeBuilder._build_chain_tree(chain_df)
-                if root:
-                    trees.append(root)
+        for anchor_ref, chain_df in df.groupby("AnchorReference"):
+            root = InterlockTreeBuilder._build_chain_tree(chain_df)
+            if root:
+                trees.append(root)
 
         return trees
 
     @staticmethod
-    def _extract_chains(date_df: pd.DataFrame) -> list[pd.DataFrame]:
-        """Extract individual chains from a date group."""
-        chains = []
-        anchor_rows = date_df[date_df["Level"] == 0]
-
-        for _, anchor in anchor_rows.drop_duplicates(subset=["Interlock_Log_ID"]).iterrows():
-            timestamp = anchor["TIMESTAMP"]
-            chain = date_df[date_df["TIMESTAMP"] == timestamp]
-            chains.append(chain)
-
-        return chains
-
-    @staticmethod
     def _build_chain_tree(chain_df: pd.DataFrame) -> InterlockNode | None:
         """Build a tree from a single chain DataFrame."""
-        levels = sorted(chain_df["Level"].unique(), reverse=False)
+        levels = sorted(chain_df["Level"].unique(), reverse=True)
 
         if not levels:
             return None
@@ -88,15 +73,19 @@ class InterlockTreeBuilder:
 
     @staticmethod
     def _extract_conditions(level_data: pd.DataFrame) -> list[InterlockCondition]:
-        """Extract conditions from level data."""
+        """Extract conditions from level data, deduplicating on (type, bit_index, message)."""
         conditions = []
+        seen: set[tuple] = set()
         for _, row in level_data.iterrows():
             if pd.notna(row.get("Condition_Message")):
-                conditions.append(InterlockCondition(
-                    type=row["TYPE"],
-                    bit_index=int(row["BIT_INDEX"]),  # ← Force conversion to int!
-                    message=row["Condition_Message"]
-                ))
+                key = (row["TYPE"], int(row["BIT_INDEX"]), row["Condition_Message"])
+                if key not in seen:
+                    seen.add(key)
+                    conditions.append(InterlockCondition(
+                        type=row["TYPE"],
+                        bit_index=int(row["BIT_INDEX"]),
+                        message=row["Condition_Message"]
+                    ))
         return conditions
 
     @staticmethod

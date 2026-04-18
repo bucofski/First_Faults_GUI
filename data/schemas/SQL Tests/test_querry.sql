@@ -143,3 +143,26 @@ BEGIN
         ON cdef.TEXT_DEF_ID = td_condition.TEXT_DEF_ID
     ORDER BY cc.Level DESC, cc.TIMESTAMP, cdef.TYPE, cdef.BIT_INDEX;
 END
+
+
+-- ============================================================================
+-- Old TD2 query updated to new First_Fault schema
+-- Replace 'JOUW_SQL_ID_HIER' with the FF_INTERLOCK_LOG.ID you want to inspect
+-- ============================================================================
+
+SELECT TOP 200
+    il.TIMESTAMP,
+    itd.MESSAGE                        AS BS_comment,
+    p.PLC_NAME                         AS PLC,
+    idef.NUMBER                        AS BSID,
+    cdef.BIT_INDEX                     AS VW_index,
+    ctd.MESSAGE                        AS VW_comment,
+    il.UPSTREAM_INTERLOCK_LOG_ID       AS UPSTREAM_INTERLOCK_REF
+FROM First_Fault.dbo.FF_INTERLOCK_LOG il
+INNER JOIN First_Fault.dbo.INTERLOCK_DEFINITION idef  ON il.INTERLOCK_DEF_ID   = idef.INTERLOCK_DEF_ID
+INNER JOIN First_Fault.dbo.PLC p                      ON idef.PLC_ID           = p.PLC_ID
+INNER JOIN First_Fault.dbo.TEXT_DEFINITION itd        ON idef.TEXT_DEF_ID      = itd.TEXT_DEF_ID
+LEFT  JOIN First_Fault.dbo.FF_CONDITION_LOG cl        ON il.ID                 = cl.INTERLOCK_LOG_ID
+LEFT  JOIN First_Fault.dbo.CONDITION_DEFINITION cdef  ON cl.CONDITION_DEF_ID   = cdef.CONDITION_DEF_ID
+LEFT  JOIN First_Fault.dbo.TEXT_DEFINITION ctd        ON cdef.TEXT_DEF_ID      = ctd.TEXT_DEF_ID
+ORDER BY il.TIMESTAMP DESC, il.ORDER_LOG DESC;

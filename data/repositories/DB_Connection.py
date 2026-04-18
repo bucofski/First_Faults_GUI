@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from contextlib import contextmanager
 from urllib.parse import quote_plus
@@ -5,6 +6,8 @@ from urllib.parse import quote_plus
 import yaml
 from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import Session, DeclarativeBase
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Constants
@@ -25,9 +28,16 @@ class Base(DeclarativeBase):
 def load_db_config(config_path: Path | None = None) -> dict:
     """Load database configuration from YAML file."""
     path = config_path or CONFIG_PATH
-    with open(path, "r") as file:
-        config = yaml.safe_load(file)
-    return config["DBconnection"]
+    try:
+        with open(path, "r") as file:
+            config = yaml.safe_load(file)
+        return config["DBconnection"]
+    except FileNotFoundError:
+        logger.error("Database config not found: %s", path)
+        raise
+    except (yaml.YAMLError, KeyError, TypeError) as e:
+        logger.error("Invalid database config in %s: %s", path, e)
+        raise
 
 
 # ============================================================================
@@ -90,6 +100,7 @@ def get_session():
         session.commit()
     except Exception:
         session.rollback()
+        logger.exception("Database session error")
         raise
     finally:
         session.close()
