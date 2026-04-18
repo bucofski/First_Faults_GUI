@@ -2,12 +2,13 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, func, select
 
 from data.orm.reporting_orm import (
     DailyHourSnapshot, DailyPlcSnapshot, LongTermTrendSnapshot,
     MtbfSnapshot, RepeatOffenderSnapshot, TopRiserSnapshot,
-    VwLongTermTrendSnapshot,
+    VwDailyHourSnapshot, VwDailyPlcSnapshot, VwTopRiserSnapshot,
+    VwMtbfSnapshot, VwRepeatOffenderSnapshot, VwLongTermTrendSnapshot,
 )
 from data.repositories.DB_Connection import get_session
 
@@ -96,26 +97,34 @@ class SnapshotRepository:
     # ------------------------------------------------------------------
 
     def get_latest_hour_snapshot(self, reference_date: date | None = None) -> tuple[date | None, list[tuple[int, int]]]:
-        """Return (snapshot_date, [(hour, count), ...]) for the given monday, or empty if no snapshot exists."""
+        """Return (snapshot_date, [(hour, count), ...]) for the given date, or empty if no snapshot exists."""
         if reference_date is None:
             return None, []
         with get_session() as session:
+            sub = select(func.max(VwDailyHourSnapshot.snapshot_date)).where(
+                VwDailyHourSnapshot.snapshot_date == reference_date
+            ).scalar_subquery()
             rows = session.execute(
-                text("EXEC sp_hour_snapshot :d"),
-                {"d": reference_date},
+                select(VwDailyHourSnapshot.snapshot_date, VwDailyHourSnapshot.hour, VwDailyHourSnapshot.fault_count)
+                .where(VwDailyHourSnapshot.snapshot_date == sub)
+                .order_by(VwDailyHourSnapshot.hour)
             ).all()
             if not rows:
                 return None, []
             return rows[0].snapshot_date, [(r.hour, r.fault_count) for r in rows]
 
     def get_latest_plc_snapshot(self, reference_date: date | None = None) -> tuple[date | None, list[tuple[str, int]]]:
-        """Return (snapshot_date, [(plc_name, count), ...]) for the given monday, or empty if no snapshot exists."""
+        """Return (snapshot_date, [(plc_name, count), ...]) for the given date, or empty if no snapshot exists."""
         if reference_date is None:
             return None, []
         with get_session() as session:
+            sub = select(func.max(VwDailyPlcSnapshot.snapshot_date)).where(
+                VwDailyPlcSnapshot.snapshot_date == reference_date
+            ).scalar_subquery()
             rows = session.execute(
-                text("EXEC sp_plc_snapshot :d"),
-                {"d": reference_date},
+                select(VwDailyPlcSnapshot.snapshot_date, VwDailyPlcSnapshot.plc_name, VwDailyPlcSnapshot.fault_count)
+                .where(VwDailyPlcSnapshot.snapshot_date == sub)
+                .order_by(VwDailyPlcSnapshot.fault_count.desc())
             ).all()
             if not rows:
                 return None, []
@@ -132,10 +141,20 @@ class SnapshotRepository:
         if reference_date is None:
             return None, []
         with get_session() as session:
+            sub = (
+                select(func.max(VwTopRiserSnapshot.snapshot_date))
+                .where(VwTopRiserSnapshot.snapshot_date  == reference_date)
+                .where(VwTopRiserSnapshot.recent_days    == recent_days)
+                .where(VwTopRiserSnapshot.baseline_days  == baseline_days)
+            ).scalar_subquery()
             rows = session.execute(
-                text("EXEC sp_top_riser_snapshot :d, :rd, :bd, :n"),
-                {"d": reference_date, "rd": recent_days, "bd": baseline_days, "n": top_n},
-            ).all()
+                select(VwTopRiserSnapshot)
+                .where(VwTopRiserSnapshot.snapshot_date  == sub)
+                .where(VwTopRiserSnapshot.recent_days    == recent_days)
+                .where(VwTopRiserSnapshot.baseline_days  == baseline_days)
+                .order_by(VwTopRiserSnapshot.delta_pct.desc())
+                .limit(top_n)
+            ).scalars().all()
             if not rows:
                 return None, []
             return rows[0].snapshot_date, [
@@ -180,10 +199,18 @@ class SnapshotRepository:
         if reference_date is None:
             return None, []
         with get_session() as session:
+            sub = (
+                select(func.max(VwRepeatOffenderSnapshot.snapshot_date))
+                .where(VwRepeatOffenderSnapshot.snapshot_date == reference_date)
+                .where(VwRepeatOffenderSnapshot.days_window   == days_window)
+            ).scalar_subquery()
             rows = session.execute(
-                text("EXEC sp_repeat_offender_snapshot :d, :dw, :n"),
-                {"d": reference_date, "dw": days_window, "n": top_n},
-            ).all()
+                select(VwRepeatOffenderSnapshot)
+                .where(VwRepeatOffenderSnapshot.snapshot_date == sub)
+                .where(VwRepeatOffenderSnapshot.days_window   == days_window)
+                .order_by(VwRepeatOffenderSnapshot.max_per_hour.desc())
+                .limit(top_n)
+            ).scalars().all()
             if not rows:
                 return None, []
             return rows[0].snapshot_date, [
@@ -198,10 +225,17 @@ class SnapshotRepository:
         if reference_date is None:
             return None, []
         with get_session() as session:
+            sub = (
+                select(func.max(VwMtbfSnapshot.snapshot_date))
+                .where(VwMtbfSnapshot.snapshot_date == reference_date)
+                .where(VwMtbfSnapshot.days_window   == days_window)
+            ).scalar_subquery()
             rows = session.execute(
-                text("EXEC sp_mtbf_snapshot :d, :dw"),
-                {"d": reference_date, "dw": days_window},
-            ).all()
+                select(VwMtbfSnapshot)
+                .where(VwMtbfSnapshot.snapshot_date == sub)
+                .where(VwMtbfSnapshot.days_window   == days_window)
+                .order_by(VwMtbfSnapshot.avg_hours)
+            ).scalars().all()
             if not rows:
                 return None, []
             return rows[0].snapshot_date, [
