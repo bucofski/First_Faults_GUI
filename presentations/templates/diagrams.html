@@ -31,6 +31,12 @@
         <div class="col-auto">
             <button type="submit" class="btn btn-primary" id="apply-btn">Apply</button>
         </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-outline-success" id="pdf-btn"
+                    data-pdf-url="{{ url_for('plc.diagrams_pdf', month=selected_month, week=selected_week) }}">
+                PDF
+            </button>
+        </div>
         {% if selected_date %}
         <div class="col-auto align-self-center">
             <span class="badge bg-info text-dark">Selected start: {{ selected_date }}</span>
@@ -97,4 +103,38 @@
     </div>
 </div>
 
+<script>
+    document.getElementById("pdf-btn").addEventListener("click", async function () {
+        const btn = this;
+        const overlay = document.getElementById("global-loading-overlay");
+        const pdfUrl = btn.dataset.pdfUrl;
+
+        overlay.classList.add("active");
+        btn.disabled = true;
+
+        try {
+            const resp = await fetch(pdfUrl, { credentials: "same-origin" });
+            if (!resp.ok) {
+                throw new Error("PDF export failed (" + resp.status + ")");
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const cd = resp.headers.get("Content-Disposition") || "";
+            const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i);
+            a.download = m ? decodeURIComponent(m[1]) : "diagrams_export.pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error(e);
+            alert("Could not generate the PDF. Check server logs for details.");
+        } finally {
+            overlay.classList.remove("active");
+            btn.disabled = false;
+        }
+    });
+</script>
 {% endblock %}

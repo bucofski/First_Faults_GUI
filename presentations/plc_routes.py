@@ -15,10 +15,12 @@ from presentations.services.diagram_service_view import DiagramService
 from business.core.fault_count_service import FaultCountService
 
 from presentations.services.pdf_generator import PdfGenerator
+from presentations.services.diagram_pdf_service import DiagramPdfService
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 service_interlock = InterlockService()
 _diagram_service = DiagramService()
+_diagram_pdf_service = DiagramPdfService()
 _fault_count_service = FaultCountService()
 
 
@@ -189,6 +191,22 @@ def diagrams():
         selected_month=selected_month,
         selected_week=selected_week,
         selected_date=selected_date.isoformat(),
+    )
+
+
+@bp.route("/diagrams-pdf")
+def diagrams_pdf():
+    now = dt.date.today()
+    selected_month = request.args.get("month", type=int, default=now.month)
+    selected_week = request.args.get("week", type=int, default=1)
+    selected_date = _first_monday_of_month_week(now.year, selected_month, selected_week)
+
+    buf = _diagram_pdf_service.generate_pdf(reference_date=selected_date)
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"diagrams_{selected_date.isoformat()}.pdf",
     )
 
 

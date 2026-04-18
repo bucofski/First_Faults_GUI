@@ -50,7 +50,7 @@ Regeltechniekers, lijnverantwoordelijken, productiebedienden bij Arcelor die CIM
 presentations/          UI-laag (Flask Blueprint, templates, services)
   plc.py                Routes (Blueprint "plc")
   templates/            Jinja2 HTML-templates
-  services/             View-services (DiagramService, PdfGenerator)
+  services/             View-services (DiagramService, DiagramPdfService, PdfGenerator)
 
 business/               Business-laag
   services/             InterlockService, FaultCountService
@@ -76,6 +76,7 @@ Dashboard met zes grafieken en een heatmap.
 - **Selectie:** Maand + week-van-de-maand dropdowns. De eerste maandag van die week wordt berekend en als `reference_date` doorgegeven om historische snapshots te filteren.
 - **Grafieken:** Faults per hour, Faults per PLC (pie), Top risers, MTBF per PLC, Top 10 climbing faults, Repeat offenders.
 - **Heatmap:** Per PLC, selecteerbaar via aparte dropdown.
+- **PDF export:** Alle grafieken worden via `DiagramPdfService` gerenderd als PNG (Plotly + Kaleido) en samengevoegd in een landscape PDF (ReportLab). Route: `/plc/diagrams-pdf`.
 - **Spinner:** Globale loading overlay (uit `base.html`) bij navigatie en form submits.
 
 Zie [docs/diagrams_page.md](docs/diagrams_page.md) voor gedetailleerde documentatie.

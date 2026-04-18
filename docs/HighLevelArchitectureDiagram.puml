@@ -13,6 +13,7 @@ package "Presentation Layer" <<Frame>> #LightBlue {
     [Templates (Jinja2)] as templates
     [Static Assets] as static
     [DiagramService] as diagram
+    [DiagramPdfService] as diagrampdf
     [PdfGenerator] as pdf
     [CredentialService] as cred
 }
@@ -41,11 +42,15 @@ flask --> templates : renders
 flask --> static : serves
 flask --> diagram : chart HTML
 flask --> analyzer : interlock analysis
-flask --> pdf : PDF export
+flask --> pdf : interlock PDF
+flask --> diagrampdf : diagrams PDF
 flask --> cred : authentication
 
 diagram --> snaprepo : read snapshots
 diagram --> faultcount : live fallback
+
+diagrampdf --> snaprepo : read snapshots
+diagrampdf --> faultcount : live fallback
 
 analyzer --> tree : builds trees
 analyzer --> formatters : formats output

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from flask import Flask, url_for, redirect, session
 
-from presentations import plc
+from presentations import plc_routes
 from presentations.services.creadential import Role
 from presentations.services.credential_service import CredentialService
 
@@ -12,7 +12,7 @@ def create_app() -> Flask:
     app = Flask("app")
     app.secret_key = "dev"
     app.jinja_options["autoescape"] = True
-    app.register_blueprint(plc.bp)
+    app.register_blueprint(plc_routes.bp)
 
     config_path = (Path(__file__).resolve().parent.parent / "config" / "config.toml")
 

@@ -57,6 +57,7 @@ package "First_Faults_GUI" {
 
         package "services" as ps {
             [diagram_service_view.py] as dsv
+            [diagram_pdf_service.py] as dpdf
             [pdf_generator.py]
             [creadential.py]
             [credential_service.py]
@@ -118,6 +119,8 @@ snaprepo --> [reporting_orm.py]
 [plc.py] --> fcs
 dsv --> snaprepo
 dsv --> fcs
+dpdf --> snaprepo
+dpdf --> fcs
 fcs --> [repository.py]
 daily --> snaprepo
 daily --> fcs
