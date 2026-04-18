@@ -2,11 +2,12 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from data.orm.reporting_orm import (
     DailyHourSnapshot, DailyPlcSnapshot, LongTermTrendSnapshot,
     MtbfSnapshot, RepeatOffenderSnapshot, TopRiserSnapshot,
+    VwLongTermTrendSnapshot,
 )
 from data.repositories.DB_Connection import get_session
 
@@ -95,46 +96,30 @@ class SnapshotRepository:
     # ------------------------------------------------------------------
 
     def get_latest_hour_snapshot(self, reference_date: date | None = None) -> tuple[date | None, list[tuple[int, int]]]:
-        """Return (snapshot_date, [(hour, count), ...]) for the most recent date on or before *reference_date*."""
+        """Return (snapshot_date, [(hour, count), ...]) for the given monday, or empty if no snapshot exists."""
+        if reference_date is None:
+            return None, []
         with get_session() as session:
-            q = select(DailyHourSnapshot.snapshot_date)
-            if reference_date is not None:
-                q = q.where(DailyHourSnapshot.snapshot_date <= reference_date)
-            latest = session.execute(
-                q.order_by(DailyHourSnapshot.snapshot_date.desc())
-                .limit(1)
-            ).scalar_one_or_none()
-
-            if latest is None:
-                return None, []
-
             rows = session.execute(
-                select(DailyHourSnapshot.hour, DailyHourSnapshot.fault_count)
-                .where(DailyHourSnapshot.snapshot_date == latest)
-                .order_by(DailyHourSnapshot.hour)
+                text("EXEC sp_hour_snapshot :d"),
+                {"d": reference_date},
             ).all()
-            return latest, [(r.hour, r.fault_count) for r in rows]
+            if not rows:
+                return None, []
+            return rows[0].snapshot_date, [(r.hour, r.fault_count) for r in rows]
 
     def get_latest_plc_snapshot(self, reference_date: date | None = None) -> tuple[date | None, list[tuple[str, int]]]:
-        """Return (snapshot_date, [(plc_name, count), ...]) sorted descending."""
+        """Return (snapshot_date, [(plc_name, count), ...]) for the given monday, or empty if no snapshot exists."""
+        if reference_date is None:
+            return None, []
         with get_session() as session:
-            q = select(DailyPlcSnapshot.snapshot_date)
-            if reference_date is not None:
-                q = q.where(DailyPlcSnapshot.snapshot_date <= reference_date)
-            latest = session.execute(
-                q.order_by(DailyPlcSnapshot.snapshot_date.desc())
-                .limit(1)
-            ).scalar_one_or_none()
-
-            if latest is None:
-                return None, []
-
             rows = session.execute(
-                select(DailyPlcSnapshot)
-                .where(DailyPlcSnapshot.snapshot_date == latest)
-                .order_by(DailyPlcSnapshot.fault_count.desc())
-            ).scalars().all()
-            return latest, [(r.plc.plc_name.strip(), r.fault_count) for r in rows]
+                text("EXEC sp_plc_snapshot :d"),
+                {"d": reference_date},
+            ).all()
+            if not rows:
+                return None, []
+            return rows[0].snapshot_date, [(r.plc_name.strip(), r.fault_count) for r in rows]
 
     def get_latest_top_risers(
         self,
@@ -143,36 +128,20 @@ class SnapshotRepository:
         top_n:         int = 10,
         reference_date: date | None = None,
     ) -> tuple[date | None, list]:
-        """Return (snapshot_date, [TopRiserSnapshot, ...]) for the most recent date on or before *reference_date*."""
+        """Return (snapshot_date, [...]) for the given monday, or empty if no snapshot exists."""
+        if reference_date is None:
+            return None, []
         with get_session() as session:
-            q = (
-                select(TopRiserSnapshot.snapshot_date)
-                .where(TopRiserSnapshot.recent_days   == recent_days)
-                .where(TopRiserSnapshot.baseline_days == baseline_days)
-            )
-            if reference_date is not None:
-                q = q.where(TopRiserSnapshot.snapshot_date <= reference_date)
-            latest = session.execute(
-                q.order_by(TopRiserSnapshot.snapshot_date.desc())
-                .limit(1)
-            ).scalar_one_or_none()
-
-            if latest is None:
-                return None, []
-
             rows = session.execute(
-                select(TopRiserSnapshot)
-                .where(TopRiserSnapshot.snapshot_date  == latest)
-                .where(TopRiserSnapshot.recent_days    == recent_days)
-                .where(TopRiserSnapshot.baseline_days  == baseline_days)
-                .order_by(TopRiserSnapshot.delta_pct.desc())
-                .limit(top_n)
-            ).scalars().all()
-
-            return latest, [
+                text("EXEC sp_top_riser_snapshot :d, :rd, :bd, :n"),
+                {"d": reference_date, "rd": recent_days, "bd": baseline_days, "n": top_n},
+            ).all()
+            if not rows:
+                return None, []
+            return rows[0].snapshot_date, [
                 {
-                    "mnemonic":       r.text_def.mnemonic.strip(),
-                    "plc_name":       r.plc.plc_name.strip(),
+                    "mnemonic":       r.mnemonic.strip(),
+                    "plc_name":       r.plc_name.strip(),
                     "recent_count":   r.recent_count,
                     "baseline_count": r.baseline_count,
                     "delta_pct":      r.delta_pct,
@@ -207,95 +176,36 @@ class SnapshotRepository:
         top_n:       int = 10,
         reference_date: date | None = None,
     ) -> tuple[date | None, list[tuple[str, str, int]]]:
-        """Return (snapshot_date, [(mnemonic, plc_name, max_per_hour), ...])."""
+        """Return (snapshot_date, [(mnemonic, plc_name, max_per_hour), ...]) for the given monday."""
+        if reference_date is None:
+            return None, []
         with get_session() as session:
-            q = (
-                select(RepeatOffenderSnapshot.snapshot_date)
-                .where(RepeatOffenderSnapshot.days_window == days_window)
-            )
-            if reference_date is not None:
-                q = q.where(RepeatOffenderSnapshot.snapshot_date <= reference_date)
-            latest = session.execute(
-                q.order_by(RepeatOffenderSnapshot.snapshot_date.desc())
-                .limit(1)
-            ).scalar_one_or_none()
-
-            if latest is None:
-                return None, []
-
             rows = session.execute(
-                select(
-                    RepeatOffenderSnapshot.plc_id,
-                    RepeatOffenderSnapshot.text_def_id,
-                    RepeatOffenderSnapshot.max_per_hour,
-                )
-                .where(RepeatOffenderSnapshot.snapshot_date == latest)
-                .where(RepeatOffenderSnapshot.days_window   == days_window)
-                .order_by(RepeatOffenderSnapshot.max_per_hour.desc())
-                .limit(top_n)
+                text("EXEC sp_repeat_offender_snapshot :d, :dw, :n"),
+                {"d": reference_date, "dw": days_window, "n": top_n},
             ).all()
-
-            from data.orm.reporting_orm import Plc, TextDefinition
-            plc_ids     = [r.plc_id      for r in rows]
-            text_def_ids = [r.text_def_id for r in rows]
-
-            plc_names = {
-                pid: name.strip() for pid, name in session.execute(
-                    select(Plc.plc_id, Plc.plc_name).where(Plc.plc_id.in_(plc_ids))
-                ).all()
-            }
-            mnemonics = {
-                tid: m.strip() for tid, m in session.execute(
-                    select(TextDefinition.text_def_id, TextDefinition.mnemonic)
-                    .where(TextDefinition.text_def_id.in_(text_def_ids))
-                ).all()
-            }
-
-            return latest, [
-                (
-                    mnemonics.get(r.text_def_id, str(r.text_def_id)),
-                    plc_names.get(r.plc_id, str(r.plc_id)),
-                    r.max_per_hour,
-                )
+            if not rows:
+                return None, []
+            return rows[0].snapshot_date, [
+                (r.mnemonic.strip(), r.plc_name.strip(), r.max_per_hour)
                 for r in rows
             ]
 
     def get_latest_mtbf(
         self, days_window: int = 30, reference_date: date | None = None,
     ) -> tuple[date | None, list[tuple[str, float, int]]]:
-        """Return (snapshot_date, [(plc_name, avg_hours, fault_count), ...]) ascending by avg_hours."""
+        """Return (snapshot_date, [(plc_name, avg_hours, fault_count), ...]) for the given monday."""
+        if reference_date is None:
+            return None, []
         with get_session() as session:
-            q = (
-                select(MtbfSnapshot.snapshot_date)
-                .where(MtbfSnapshot.days_window == days_window)
-            )
-            if reference_date is not None:
-                q = q.where(MtbfSnapshot.snapshot_date <= reference_date)
-            latest = session.execute(
-                q.order_by(MtbfSnapshot.snapshot_date.desc())
-                .limit(1)
-            ).scalar_one_or_none()
-
-            if latest is None:
-                return None, []
-
             rows = session.execute(
-                select(MtbfSnapshot.avg_hours, MtbfSnapshot.fault_count, MtbfSnapshot.plc_id)
-                .where(MtbfSnapshot.snapshot_date == latest)
-                .where(MtbfSnapshot.days_window   == days_window)
-                .order_by(MtbfSnapshot.avg_hours)
+                text("EXEC sp_mtbf_snapshot :d, :dw"),
+                {"d": reference_date, "dw": days_window},
             ).all()
-
-            plc_ids = [r.plc_id for r in rows]
-            from data.orm.reporting_orm import Plc
-            plc_names = {
-                plc_id: name for plc_id, name in session.execute(
-                    select(Plc.plc_id, Plc.plc_name).where(Plc.plc_id.in_(plc_ids))
-                ).all()
-            }
-
-            return latest, [
-                (plc_names.get(r.plc_id, str(r.plc_id)).strip(), r.avg_hours, r.fault_count)
+            if not rows:
+                return None, []
+            return rows[0].snapshot_date, [
+                (r.plc_name.strip(), r.avg_hours, r.fault_count)
                 for r in rows
             ]
 
@@ -333,11 +243,13 @@ class SnapshotRepository:
         with get_session() as session:
             rows = session.execute(
                 select(
-                    LongTermTrendSnapshot.week_start,
-                    LongTermTrendSnapshot.plc_id,
-                    LongTermTrendSnapshot.text_def_id,
-                    LongTermTrendSnapshot.weekly_count,
-                ).order_by(LongTermTrendSnapshot.week_start)
+                    VwLongTermTrendSnapshot.week_start,
+                    VwLongTermTrendSnapshot.plc_id,
+                    VwLongTermTrendSnapshot.text_def_id,
+                    VwLongTermTrendSnapshot.plc_name,
+                    VwLongTermTrendSnapshot.mnemonic,
+                    VwLongTermTrendSnapshot.weekly_count,
+                ).order_by(VwLongTermTrendSnapshot.week_start)
             ).all()
 
             if not rows:
@@ -345,25 +257,11 @@ class SnapshotRepository:
 
             from collections import defaultdict as _dd
             series: dict[tuple, list] = _dd(list)
+            labels: dict[tuple, tuple] = {}
             for r in rows:
-                series[(r.plc_id, r.text_def_id)].append((r.week_start, r.weekly_count))
-
-            from data.orm.reporting_orm import Plc, TextDefinition
-            all_plc_ids      = list({k[0] for k in series})
-            all_text_def_ids = list({k[1] for k in series})
-
-            plc_names = {
-                pid: name.strip() for pid, name in session.execute(
-                    select(Plc.plc_id, Plc.plc_name)
-                    .where(Plc.plc_id.in_(all_plc_ids))
-                ).all()
-            }
-            mnemonics = {
-                tid: m.strip() for tid, m in session.execute(
-                    select(TextDefinition.text_def_id, TextDefinition.mnemonic)
-                    .where(TextDefinition.text_def_id.in_(all_text_def_ids))
-                ).all()
-            }
+                key = (r.plc_id, r.text_def_id)
+                series[key].append((r.week_start, r.weekly_count))
+                labels[key] = (r.mnemonic.strip(), r.plc_name.strip())
 
         results = []
         for (plc_id, text_def_id), weekly in series.items():
@@ -376,9 +274,10 @@ class SnapshotRepository:
             climb      = last_avg - first_avg
             if climb <= 0:
                 continue
+            mnemonic, plc_name = labels.get((plc_id, text_def_id), (str(text_def_id), str(plc_id)))
             results.append({
-                "mnemonic": mnemonics.get(text_def_id, str(text_def_id)),
-                "plc_name": plc_names.get(plc_id, str(plc_id)),
+                "mnemonic": mnemonic,
+                "plc_name": plc_name,
                 "weeks":    weekly,
                 "climb":    round(climb, 2),
             })

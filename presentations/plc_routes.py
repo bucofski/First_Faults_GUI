@@ -1,4 +1,5 @@
 import datetime as dt
+import time
 
 from flask import (
     Blueprint,
@@ -167,13 +168,33 @@ def diagrams():
     # Build month options list
     months = [(m, dt.date(selected_year, m, 1).strftime("%B")) for m in range(1, 13)]
 
+    t0 = time.perf_counter()
     chart_html  = _diagram_service.grouped_bar_chart_html(reference_date=selected_date)
+    print(f"[TIMING] grouped_bar_chart:   {time.perf_counter()-t0:.2f}s", flush=True)
+
+    t0 = time.perf_counter()
     chart_html2 = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
+    print(f"[TIMING] grouped_bar_chart_2: {time.perf_counter()-t0:.2f}s", flush=True)
+
+    t0 = time.perf_counter()
     pie_html    = _diagram_service.pie_chart_html(reference_date=selected_date)
+    print(f"[TIMING] pie_chart:           {time.perf_counter()-t0:.2f}s", flush=True)
+
+    t0 = time.perf_counter()
     heatmap     = _diagram_service.heatmap_html(selected_plc) if selected_plc else ""
+    print(f"[TIMING] heatmap:             {time.perf_counter()-t0:.2f}s", flush=True)
+
+    t0 = time.perf_counter()
     mtbf_html   = _diagram_service.mtbf_html(reference_date=selected_date)
+    print(f"[TIMING] mtbf:                {time.perf_counter()-t0:.2f}s", flush=True)
+
+    t0 = time.perf_counter()
     long_html   = _diagram_service.long_term_trend_html()
+    print(f"[TIMING] long_term_trend:     {time.perf_counter()-t0:.2f}s", flush=True)
+
+    t0 = time.perf_counter()
     repeat_offender = _diagram_service.repeat_offenders_html(reference_date=selected_date)
+    print(f"[TIMING] repeat_offenders:    {time.perf_counter()-t0:.2f}s", flush=True)
 
     return render_template(
         "diagrams.html",
