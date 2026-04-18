@@ -167,12 +167,12 @@ def diagrams():
     # Build month options list
     months = [(m, dt.date(selected_year, m, 1).strftime("%B")) for m in range(1, 13)]
 
-    chart_html  = _diagram_service.grouped_bar_chart_html(reference_date=selected_date)
-    chart_html2 = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
-    pie_html    = _diagram_service.pie_chart_html(reference_date=selected_date)
-    heatmap     = _diagram_service.heatmap_html(selected_plc) if selected_plc else ""
-    mtbf_html   = _diagram_service.mtbf_html(reference_date=selected_date)
-    long_html   = _diagram_service.long_term_trend_html()
+    chart_html      = _diagram_service.grouped_bar_chart_html(reference_date=selected_date)
+    chart_html2     = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
+    pie_html        = _diagram_service.pie_chart_html(reference_date=selected_date)
+    heatmap         = _diagram_service.heatmap_html(selected_plc) if selected_plc else ""
+    mtbf_html       = _diagram_service.mtbf_html(reference_date=selected_date)
+    long_html       = _diagram_service.long_term_trend_html()
     repeat_offender = _diagram_service.repeat_offenders_html(reference_date=selected_date)
 
     return render_template(

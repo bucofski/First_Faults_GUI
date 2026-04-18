@@ -77,19 +77,13 @@ class DiagramService:
 
         snapshot_date, rows = self._repo.get_latest_top_risers(recent_days, baseline_days, top_n, reference_date=reference_date)
 
-        if rows:
-            labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
-            delta_pcts = [r['delta_pct']                        for r in rows]
-            custom     = [[r['recent_count'], r['baseline_count']] for r in rows]
-            ref_label  = str(snapshot_date)
-        else:
-            live = FaultCountService().get_top_risers(
-                recent_days=recent_days, baseline_days=baseline_days, top_n=top_n,
-            )
-            labels     = [f"{r.mnemonic} ({r.plc_name})" for r in live]
-            delta_pcts = [r.delta_pct                     for r in live]
-            custom     = [[r.recent_count, r.baseline_count] for r in live]
-            ref_label  = "live"
+        if not rows:
+            return "<p>No top risers snapshot available for this week yet.</p>"
+
+        labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
+        delta_pcts = [r['delta_pct']                        for r in rows]
+        custom     = [[r['recent_count'], r['baseline_count']] for r in rows]
+        ref_label  = str(snapshot_date)
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -120,15 +114,12 @@ class DiagramService:
 
         snapshot_date, rows = self._repo.get_latest_repeat_offenders(days_window=days, top_n=top_n, reference_date=reference_date)
 
-        if rows:
-            labels = [f"{mnemonic} ({plc})" for mnemonic, plc, _ in rows]
-            counts = [c for _, _, c in rows]
-            title  = f"Repeat offenders — {snapshot_date} (last {days}d)"
-        else:
-            live   = FaultCountService().get_repeat_offenders(days=days, top_n=top_n)
-            labels = [f"{r.mnemonic} ({r.plc_name})" for r in live]
-            counts = [r.max_per_hour for r in live]
-            title  = f"Repeat offenders — last {days}d (live)"
+        if not rows:
+            return "<p>No repeat offender snapshot available for this week yet.</p>"
+
+        labels = [f"{mnemonic} ({plc})" for mnemonic, plc, _ in rows]
+        counts = [c for _, _, c in rows]
+        title  = f"Repeat offenders — {snapshot_date} (last {days}d)"
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -190,17 +181,13 @@ class DiagramService:
     def mtbf_html(self, days: int = 30, reference_date: date | None = None) -> str:
         snapshot_date, rows = self._repo.get_latest_mtbf(days_window=days, reference_date=reference_date)
 
-        if rows:
-            plcs        = [r[0] for r in rows]
-            avg_hours   = [r[1] for r in rows]
-            fault_counts = [r[2] for r in rows]
-            title = f"MTBF per PLC — {snapshot_date} (last {days}d)"
-        else:
-            live = FaultCountService().get_mtbf_per_plc(days=days)
-            plcs         = [r.plc_name    for r in live]
-            avg_hours    = [r.avg_hours   for r in live]
-            fault_counts = [r.fault_count for r in live]
-            title = f"MTBF per PLC — last {days}d (live)"
+        if not rows:
+            return "<p>No MTBF snapshot available for this week yet.</p>"
+
+        plcs         = [r[0] for r in rows]
+        avg_hours    = [r[1] for r in rows]
+        fault_counts = [r[2] for r in rows]
+        title        = f"MTBF per PLC — {snapshot_date} (last {days}d)"
 
         fig = go.Figure()
         fig.add_trace(go.Bar(

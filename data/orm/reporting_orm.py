@@ -104,3 +104,79 @@ class LongTermTrendSnapshot(Base):
     plc_id:       Mapped[int]  = mapped_column(Integer, ForeignKey("PLC.PLC_ID"))
     text_def_id:  Mapped[int]  = mapped_column(Integer, ForeignKey("TEXT_DEFINITION.TEXT_DEF_ID"))
     weekly_count: Mapped[int]  = mapped_column(Integer)
+
+
+# ---------------------------------------------------------------------------
+# View-backed ORM classes (flat, no lazy relationships)
+# ---------------------------------------------------------------------------
+
+class VwDailyHourSnapshot(Base):
+    __tablename__ = "vw_daily_hour_snapshot"
+
+    id:            Mapped[int]  = mapped_column(Integer, primary_key=True)
+    snapshot_date: Mapped[date] = mapped_column(DATE)
+    hour:          Mapped[int]  = mapped_column(Integer)
+    fault_count:   Mapped[int]  = mapped_column(Integer)
+
+
+class VwDailyPlcSnapshot(Base):
+    __tablename__ = "vw_daily_plc_snapshot"
+
+    id:            Mapped[int]  = mapped_column(Integer, primary_key=True)
+    snapshot_date: Mapped[date] = mapped_column(DATE)
+    plc_id:        Mapped[int]  = mapped_column(Integer)
+    plc_name:      Mapped[str]  = mapped_column(String)
+    fault_count:   Mapped[int]  = mapped_column(Integer)
+
+
+class VwTopRiserSnapshot(Base):
+    __tablename__ = "vw_top_riser_snapshot"
+
+    id:             Mapped[int]   = mapped_column(Integer, primary_key=True)
+    snapshot_date:  Mapped[date]  = mapped_column(DATE)
+    recent_days:    Mapped[int]   = mapped_column(Integer)
+    baseline_days:  Mapped[int]   = mapped_column(Integer)
+    plc_id:         Mapped[int]   = mapped_column(Integer)
+    plc_name:       Mapped[str]   = mapped_column(String)
+    text_def_id:    Mapped[int]   = mapped_column(Integer)
+    mnemonic:       Mapped[str]   = mapped_column(String)
+    recent_count:   Mapped[int]   = mapped_column(Integer)
+    baseline_count: Mapped[int]   = mapped_column(Integer)
+    delta_pct:      Mapped[float] = mapped_column(Float)
+
+
+class VwMtbfSnapshot(Base):
+    __tablename__ = "vw_mtbf_snapshot"
+
+    id:            Mapped[int]   = mapped_column(Integer, primary_key=True)
+    snapshot_date: Mapped[date]  = mapped_column(DATE)
+    days_window:   Mapped[int]   = mapped_column(Integer)
+    plc_id:        Mapped[int]   = mapped_column(Integer)
+    plc_name:      Mapped[str]   = mapped_column(String)
+    avg_hours:     Mapped[float] = mapped_column(Float)
+    fault_count:   Mapped[int]   = mapped_column(Integer)
+
+
+class VwRepeatOffenderSnapshot(Base):
+    __tablename__ = "vw_repeat_offender_snapshot"
+
+    id:            Mapped[int]  = mapped_column(Integer, primary_key=True)
+    snapshot_date: Mapped[date] = mapped_column(DATE)
+    days_window:   Mapped[int]  = mapped_column(Integer)
+    plc_id:        Mapped[int]  = mapped_column(Integer)
+    plc_name:      Mapped[str]  = mapped_column(String)
+    text_def_id:   Mapped[int]  = mapped_column(Integer)
+    mnemonic:      Mapped[str]  = mapped_column(String)
+    max_per_hour:  Mapped[int]  = mapped_column(Integer)
+
+
+class VwLongTermTrendSnapshot(Base):
+    __tablename__ = "vw_long_term_trend_snapshot"
+
+    id:           Mapped[int]  = mapped_column(Integer, primary_key=True)
+    week_start:   Mapped[date] = mapped_column(DATE)
+    plc_id:       Mapped[int]  = mapped_column(Integer)
+    plc_name:     Mapped[str]  = mapped_column(String)
+    text_def_id:  Mapped[int]  = mapped_column(Integer)
+    mnemonic:     Mapped[str]  = mapped_column(String)
+    weekly_count: Mapped[int]  = mapped_column(Integer)
