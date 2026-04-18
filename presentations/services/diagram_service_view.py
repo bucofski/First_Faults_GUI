@@ -3,7 +3,7 @@ from datetime import date
 import plotly.graph_objects as go
 from plotly.offline import plot
 
-from business.services.fault_count_service import FaultCountService
+from business.core.fault_count_service import FaultCountService
 from data.repositories.snapshot_repository import SnapshotRepository
 
 

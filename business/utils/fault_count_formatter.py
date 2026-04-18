@@ -3,7 +3,7 @@
 import plotly.graph_objects as go
 from plotly.offline import plot
 
-from business.services.fault_count_service import DailyFaultCounts, FaultCountService
+from business.core.fault_count_service import DailyFaultCounts, FaultCountService
 
 
 class FaultCountFormatter:

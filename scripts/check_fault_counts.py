@@ -1,7 +1,7 @@
 """Print yesterday's fault counts per hour and per PLC."""
 
 import pprint
-from business.services.fault_count_service import FaultCountService
+from business.core.fault_count_service import FaultCountService
 
 service = FaultCountService()
 

@@ -12,7 +12,7 @@ from flask import (
 
 from business.services.analyzer import InterlockService
 from presentations.services.diagram_service_view import DiagramService
-from business.services.fault_count_service import FaultCountService
+from business.core.fault_count_service import FaultCountService
 
 from presentations.services.pdf_generator import PdfGenerator
 

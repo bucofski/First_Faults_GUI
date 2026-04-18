@@ -6,7 +6,7 @@ older than 90 days.
 
 from datetime import datetime, timedelta, timezone
 
-from business.services.fault_count_service import FaultCountService
+from business.core.fault_count_service import FaultCountService
 from data.repositories.snapshot_repository import SnapshotRepository
 
 try:

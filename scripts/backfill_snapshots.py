@@ -4,9 +4,9 @@ Run once after creating the snapshot tables, then delete this script.
 Skips dates that already have a snapshot.
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
-from business.services.fault_count_service import FaultCountService
+from business.core.fault_count_service import FaultCountService
 from data.repositories.snapshot_repository import SnapshotRepository, RETENTION_DAYS
 
 try:
