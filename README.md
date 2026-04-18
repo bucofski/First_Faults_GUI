@@ -41,6 +41,9 @@ Regeltechniekers, lijnverantwoordelijken, productiebedienden bij Arcelor die CIM
 
 ## 5. Architectuur
 
+### High-level Architectuur
+![High-level Architecture](docs/HighLevelArchitectureDiagram.png)
+
 ### Lagenstructuur
 
 ```
@@ -129,7 +132,7 @@ flask --app app run --debug
 - [Projectverloop](docs/project_verloop.md) – tijdlijn, Gantt chart, bereikte doelen per fase
 
 ## Structure
-![img.png](docs/img.png)
+![Project Structure](docs/ProjectStructureDiagram.png)
 
 ## Licence
 
