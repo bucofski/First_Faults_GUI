@@ -89,9 +89,15 @@ CREATE TABLE FF_CONDITION_LOG (
 -- Indexes
 -- ============================================================================
 CREATE INDEX IX_InterlockLog_Timestamp      ON FF_INTERLOCK_LOG(TIMESTAMP DESC);
-CREATE INDEX IX_InterlockLog_DefID          ON FF_INTERLOCK_LOG(INTERLOCK_DEF_ID);
-CREATE INDEX IX_InterlockLog_Upstream       ON FF_INTERLOCK_LOG(UPSTREAM_INTERLOCK_LOG_ID);
-CREATE INDEX IX_ConditionLog_InterlockID    ON FF_CONDITION_LOG(INTERLOCK_LOG_ID);
+-- Covering: anchor path for @TargetBSID filter + TOP N ORDER BY in fn_InterlockChain.
+CREATE INDEX IX_InterlockLog_DefID          ON FF_INTERLOCK_LOG(INTERLOCK_DEF_ID, TIMESTAMP DESC, ORDER_LOG DESC, ID DESC)
+    INCLUDE (UPSTREAM_INTERLOCK_LOG_ID);
+-- Covering: DownstreamChain recursive join in fn_InterlockChain.
+CREATE INDEX IX_InterlockLog_Upstream       ON FF_INTERLOCK_LOG(UPSTREAM_INTERLOCK_LOG_ID)
+    INCLUDE (INTERLOCK_DEF_ID, TIMESTAMP);
+-- Covering: condition lookup in fn_InterlockChain's final SELECT.
+CREATE INDEX IX_ConditionLog_InterlockID    ON FF_CONDITION_LOG(INTERLOCK_LOG_ID)
+    INCLUDE (CONDITION_DEF_ID);
 CREATE INDEX IX_InterlockDef_Number         ON INTERLOCK_DEFINITION(NUMBER);
 CREATE INDEX IX_InterlockDef_PLC            ON INTERLOCK_DEFINITION(PLC_ID);
 CREATE INDEX IX_InterlockDef_Text           ON INTERLOCK_DEFINITION(TEXT_DEF_ID);
