@@ -68,6 +68,28 @@ class DiagramService:
         return plot(fig, include_plotlyjs=False, output_type='div')
 
 
+    def pie_chart_window_html(self, days: int = 7) -> str:
+        start_date, counts = self._fc_service.get_plc_counts_window(days=days)
+        if not counts:
+            return "<p>No fault data available for the past week.</p>"
+
+        labels = [p.plc_name    for p in counts]
+        values = [p.fault_count for p in counts]
+
+        fig = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=values,
+            textinfo='label+percent',
+            insidetextorientation='radial',
+        )])
+        fig.update_layout(
+            margin=dict(t=40, r=20, b=40, l=20),
+            height=450,
+            title=f"Faults per PLC — last {days}d (from {start_date})",
+        )
+        return plot(fig, include_plotlyjs=False, output_type='div')
+
+
     def grouped_bar_chart_2_html(self,
         recent_days:   int = 7,
         baseline_days: int = 30,
@@ -77,13 +99,21 @@ class DiagramService:
 
         snapshot_date, rows = self._repo.get_latest_top_risers(recent_days, baseline_days, top_n, reference_date=reference_date)
 
-        if not rows:
-            return "<p>No top risers snapshot available for this week yet.</p>"
-
-        labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
-        delta_pcts = [r['delta_pct']                        for r in rows]
-        custom     = [[r['recent_count'], r['baseline_count']] for r in rows]
-        ref_label  = str(snapshot_date)
+        if rows:
+            labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
+            delta_pcts = [r['delta_pct']                        for r in rows]
+            custom     = [[r['recent_count'], r['baseline_count']] for r in rows]
+            ref_label  = str(snapshot_date)
+        else:
+            live = self._fc_service.get_top_risers(
+                recent_days=recent_days, baseline_days=baseline_days, top_n=top_n,
+            )
+            if not live:
+                return "<p>No top risers data available yet.</p>"
+            labels     = [f"{r.mnemonic} ({r.plc_name})" for r in live]
+            delta_pcts = [r.delta_pct                    for r in live]
+            custom     = [[r.recent_count, r.baseline_count] for r in live]
+            ref_label  = "live"
 
         fig = go.Figure()
         fig.add_trace(go.Bar(

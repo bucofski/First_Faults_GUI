@@ -9,7 +9,6 @@ from flask import (
     url_for, get_flashed_messages,
     send_file,
 )
-
 from business.services.analyzer import InterlockService
 from presentations.services.diagram_service_view import DiagramService
 from business.core.fault_count_service import FaultCountService
@@ -114,7 +113,16 @@ def _parse_table_tree_filters_or_redirect(*, redirect_endpoint: str):
 
 @bp.route("/")
 def home():
-    return render_template("home.html", title="Home")
+    today = dt.date.today()
+    selected_date = today - dt.timedelta(days=today.weekday() + 7)
+    top_risers_html = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
+    plc_pie_html    = _diagram_service.pie_chart_html(reference_date=selected_date)
+    return render_template(
+        "home.html",
+        title="Home",
+        top_risers_html=top_risers_html,
+        plc_pie_html=plc_pie_html,
+    )
 
 
 @bp.route("/table")

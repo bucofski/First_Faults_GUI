@@ -162,7 +162,6 @@
 
 <script>
     const form = document.getElementById("bsid-form");
-    const overlay = document.getElementById("global-loading-overlay");
     const loadBtn = document.getElementById("submit-btn");
     const pdfBtn = document.getElementById("pdf-btn");
 
@@ -172,7 +171,8 @@
 
     pdfBtn.addEventListener("click", async function () {
         const pdfUrl = pdfBtn.dataset.pdfUrl;
-        overlay.classList.add("active");
+        const loadingOverlay = document.getElementById("global-loading-overlay");
+        if (loadingOverlay) loadingOverlay.classList.add("active");
         pdfBtn.disabled = true;
 
         try {
@@ -205,7 +205,7 @@
             console.error(e);
             alert("Could not generate/download the PDF. Check server logs for details.");
         } finally {
-            overlay.classList.remove("active");
+            if (loadingOverlay) loadingOverlay.classList.remove("active");
             pdfBtn.disabled = false;
             loadBtn.disabled = false;
         }
@@ -216,23 +216,24 @@
         window.location.href = "{{ url_for('plc.table_tree') }}";
     });
 
+    function setSubtreeVisible(nodeId, visible) {
+        const rows = document.querySelectorAll(".child-of-" + CSS.escape(nodeId));
+        rows.forEach(r => {
+            r.style.display = visible ? "" : "none";
+            const childToggle = r.querySelector(".toggle");
+            if (childToggle) {
+                childToggle.textContent = visible ? "\u25bc" : "\u25b6";
+                setSubtreeVisible(childToggle.getAttribute("data-target"), visible);
+            }
+        });
+    }
+
     document.addEventListener("click", function (e) {
         const t = e.target.closest(".toggle");
         if (!t) return;
-        const id = t.getAttribute("data-target");
-        const rows = document.querySelectorAll(".child-of-" + CSS.escape(id));
         const isOpen = t.textContent.trim() === "\u25bc";
-
-        rows.forEach(r => {
-            r.style.display = isOpen ? "none" : "";
-            if (isOpen) {
-                const nestedToggle = r.querySelector(".toggle");
-                if (nestedToggle && nestedToggle.textContent.trim() === "\u25bc") {
-                    nestedToggle.click();
-                }
-            }
-        });
         t.textContent = isOpen ? "\u25b6" : "\u25bc";
+        setSubtreeVisible(t.getAttribute("data-target"), !isOpen);
     });
 </script>
 {% endblock %}
