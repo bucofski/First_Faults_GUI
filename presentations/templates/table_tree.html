@@ -216,23 +216,24 @@
         window.location.href = "{{ url_for('plc.table_tree') }}";
     });
 
+    function setSubtreeVisible(nodeId, visible) {
+        const rows = document.querySelectorAll(".child-of-" + CSS.escape(nodeId));
+        rows.forEach(r => {
+            r.style.display = visible ? "" : "none";
+            const childToggle = r.querySelector(".toggle");
+            if (childToggle) {
+                childToggle.textContent = visible ? "\u25bc" : "\u25b6";
+                setSubtreeVisible(childToggle.getAttribute("data-target"), visible);
+            }
+        });
+    }
+
     document.addEventListener("click", function (e) {
         const t = e.target.closest(".toggle");
         if (!t) return;
-        const id = t.getAttribute("data-target");
-        const rows = document.querySelectorAll(".child-of-" + CSS.escape(id));
         const isOpen = t.textContent.trim() === "\u25bc";
-
-        rows.forEach(r => {
-            r.style.display = isOpen ? "none" : "";
-            if (isOpen) {
-                const nestedToggle = r.querySelector(".toggle");
-                if (nestedToggle && nestedToggle.textContent.trim() === "\u25bc") {
-                    nestedToggle.click();
-                }
-            }
-        });
         t.textContent = isOpen ? "\u25b6" : "\u25bc";
+        setSubtreeVisible(t.getAttribute("data-target"), !isOpen);
     });
 </script>
 {% endblock %}
