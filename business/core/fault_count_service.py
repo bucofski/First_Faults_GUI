@@ -143,6 +143,18 @@ class FaultCountService:
             by_plc=self._count_by_plc(rows),
         )
 
+    def get_plc_counts_window(self, days: int = 7) -> tuple[date, list[PlcCount]]:
+        """Faults per PLC over the last `days` days ending yesterday (Brussels)."""
+        today      = datetime.now(tz=_BRUSSELS).date()
+        end_date   = today
+        start_date = today - timedelta(days=days)
+
+        rows = self._fetch_window(
+            self._date_to_utc(start_date),
+            self._date_to_utc(end_date),
+        )
+        return start_date, self._count_by_plc(rows)
+
     def get_top_risers(
         self,
         reference_date: Optional[date] = None,
