@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>PLC Situation</h1>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ top_risers_html|safe }}</div></div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ plc_pie_html|safe }}</div></div>
+    </div>
+</div>
+
+{% endblock %}

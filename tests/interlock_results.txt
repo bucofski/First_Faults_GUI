@@ -1,0 +1,332 @@
+
+  [
+    {
+      "level": -1,
+      "interlock_log_id": 47471,
+      "bsid": "31220",
+      "plc": "TDS",
+      "direction": "DOWNSTREAM",
+      "timestamp": "2025-11-06 13:20:07",
+      "interlock_message": "VrijgaveAanlopen_KOPPELZO",
+      "status": "EFFECT",
+      "conditions": [
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        }
+      ]
+    },
+    [
+      [
+        {
+          "level": 0,
+          "interlock_log_id": 395763,
+          "bsid": "11222",
+          "plc": "TDS",
+          "direction": "ANCHOR",
+          "timestamp": "2025-11-06 13:20:07",
+          "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+          "status": "*** STARTING POINT ***",
+          "conditions": [
+            {
+              "type": 1,
+              "bit_index": 11,
+              "message": "Vrijgave TrekOpbouw Koppelzone van Trekregelingen"
+            }
+          ]
+        },
+        [
+          [
+            {
+              "level": 1,
+              "interlock_log_id": 381248,
+              "bsid": "10122",
+              "plc": "TDS",
+              "direction": "UPSTREAM",
+              "timestamp": "2025-11-06 13:20:07",
+              "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Trekregeling",
+              "status": "*** ROOT CAUSE ***",
+              "conditions": [
+                {
+                  "type": 1,
+                  "bit_index": 0,
+                  "message": "Geen Bandbreukdetectie of slip in Tandem"
+                }
+              ]
+            },
+            []
+          ]
+        ]
+      ]
+    ]
+  ],
+  [
+    {
+      "level": -1,
+      "interlock_log_id": 453350,
+      "bsid": "31220",
+      "plc": "TDS",
+      "direction": "DOWNSTREAM",
+      "timestamp": "2025-11-06 11:09:26",
+      "interlock_message": "VrijgaveAanlopen_KOPPELZO",
+      "status": "EFFECT",
+      "conditions": [
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        },
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        }
+      ]
+    },
+    [
+      [
+        {
+          "level": 0,
+          "interlock_log_id": 253724,
+          "bsid": "11222",
+          "plc": "TDS",
+          "direction": "ANCHOR",
+          "timestamp": "2025-11-06 11:09:26",
+          "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+          "status": "*** STARTING POINT ***",
+          "conditions": [
+            {
+              "type": 1,
+              "bit_index": 7,
+              "message": "Vrijgave TrekOpbouw Koppelzone van Machineposities"
+            }
+          ]
+        },
+        [
+          [
+            {
+              "level": 1,
+              "interlock_log_id": 467225,
+              "bsid": "10118",
+              "plc": "TDS",
+              "direction": "UPSTREAM",
+              "timestamp": "2025-11-06 11:09:26",
+              "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Machineposities",
+              "status": "*** ROOT CAUSE ***",
+              "conditions": [
+                {
+                  "type": 1,
+                  "bit_index": 0,
+                  "message": "Accu 3 niet voorbij positie leeg"
+                }
+              ]
+            },
+            []
+          ]
+        ]
+      ]
+    ]
+  ],
+  [
+    {
+      "level": -1,
+      "interlock_log_id": 297040,
+      "bsid": "11221",
+      "plc": "TDS",
+      "direction": "DOWNSTREAM",
+      "timestamp": "2025-11-06 09:59:01",
+      "interlock_message": "VrijgaveTrekOpbouw",
+      "status": "EFFECT",
+      "conditions": [
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        },
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        }
+      ]
+    },
+    [
+      [
+        {
+          "level": 0,
+          "interlock_log_id": 108181,
+          "bsid": "11222",
+          "plc": "TDS",
+          "direction": "ANCHOR",
+          "timestamp": "2025-11-06 09:59:01",
+          "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+          "status": "*** STARTING POINT ***",
+          "conditions": [
+            {
+              "type": 1,
+              "bit_index": 7,
+              "message": "Vrijgave TrekOpbouw Koppelzone van Machineposities"
+            }
+          ]
+        },
+        [
+          [
+            {
+              "level": 1,
+              "interlock_log_id": 430273,
+              "bsid": "10118",
+              "plc": "TDS",
+              "direction": "UPSTREAM",
+              "timestamp": "2025-11-06 09:59:01",
+              "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Machineposities",
+              "status": "*** ROOT CAUSE ***",
+              "conditions": [
+                {
+                  "type": 1,
+                  "bit_index": 0,
+                  "message": "Accu 3 niet voorbij positie leeg"
+                }
+              ]
+            },
+            []
+          ]
+        ]
+      ]
+    ]
+  ],
+  [
+    {
+      "level": -1,
+      "interlock_log_id": 386065,
+      "bsid": "11221",
+      "plc": "TDS",
+      "direction": "DOWNSTREAM",
+      "timestamp": "2025-11-06 07:34:44",
+      "interlock_message": "VrijgaveTrekOpbouw",
+      "status": "EFFECT",
+      "conditions": [
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        },
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        }
+      ]
+    },
+    [
+      [
+        {
+          "level": 0,
+          "interlock_log_id": 495186,
+          "bsid": "11222",
+          "plc": "TDS",
+          "direction": "ANCHOR",
+          "timestamp": "2025-11-06 07:34:44",
+          "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+          "status": "*** STARTING POINT ***",
+          "conditions": [
+            {
+              "type": 1,
+              "bit_index": 7,
+              "message": "Vrijgave TrekOpbouw Koppelzone van Machineposities"
+            }
+          ]
+        },
+        [
+          [
+            {
+              "level": 1,
+              "interlock_log_id": 416731,
+              "bsid": "10118",
+              "plc": "TDS",
+              "direction": "UPSTREAM",
+              "timestamp": "2025-11-06 07:34:44",
+              "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Machineposities",
+              "status": "*** ROOT CAUSE ***",
+              "conditions": [
+                {
+                  "type": 1,
+                  "bit_index": 0,
+                  "message": "Accu 3 niet voorbij positie leeg"
+                }
+              ]
+            },
+            []
+          ]
+        ]
+      ]
+    ]
+  ],
+  [
+    {
+      "level": -1,
+      "interlock_log_id": 75585,
+      "bsid": "31220",
+      "plc": "TDS",
+      "direction": "DOWNSTREAM",
+      "timestamp": "2025-11-06 07:05:24",
+      "interlock_message": "VrijgaveAanlopen_KOPPELZO",
+      "status": "EFFECT",
+      "conditions": [
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        },
+        {
+          "type": 1,
+          "bit_index": 0,
+          "message": "Vrijgave TrekOpbouw Koppelzone  van"
+        }
+      ]
+    },
+    [
+      [
+        {
+          "level": 0,
+          "interlock_log_id": 329732,
+          "bsid": "11222",
+          "plc": "TDS",
+          "direction": "ANCHOR",
+          "timestamp": "2025-11-06 07:05:24",
+          "interlock_message": "VrijgaveTrekOpbouw_KOPPELZO",
+          "status": "*** STARTING POINT ***",
+          "conditions": [
+            {
+              "type": 1,
+              "bit_index": 7,
+              "message": "Vrijgave TrekOpbouw Koppelzone van Machineposities"
+            }
+          ]
+        },
+        [
+          [
+            {
+              "level": 1,
+              "interlock_log_id": 145325,
+              "bsid": "10118",
+              "plc": "TDS",
+              "direction": "UPSTREAM",
+              "timestamp": "2025-11-06 07:05:24",
+              "interlock_message": "Vrijgave_Trekopbouw_KOPPELZO_Machineposities",
+              "status": "*** ROOT CAUSE ***",
+              "conditions": [
+                {
+                  "type": 1,
+                  "bit_index": 0,
+                  "message": "Accu 3 niet voorbij positie leeg"
+                }
+              ]
+            },
+            []
+          ]
+        ]
+      ]
+    ]
+  ]
+]

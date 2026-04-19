@@ -1,0 +1,48 @@
+# Project configuration
+[project]
+name = "my_app"
+version = "0.1.0"
+description = "Example application"
+authors = ["Your Name <you@example.com>"]
+
+[server]
+host = "0.0.0.0"
+port = 8080
+debug = true
+
+[logging]
+level = "INFO"
+format = "%(asctime)s %(levelname)s %(message)s"
+file = "logs/app.log"
+rotate = true
+max_bytes = 10485760
+backup_count = 5
+
+[database]
+driver = "postgresql"
+host = "localhost"
+port = 5432
+name = "my_app_db"
+user = "my_app_user"
+password = "change-me"
+pool_size = 10
+timeout_seconds = 30
+
+[features]
+enable_metrics = true
+enable_tracing = false
+
+[secrets]
+# Prefer environment variables, but allow defaults:
+jwt_secret = "${JWT_SECRET:-change-me}"
+
+[env.dev]
+server.debug = true
+logging.level = "DEBUG"
+database.host = "localhost"
+
+[env.prod]
+server.debug = false
+logging.level = "INFO"
+database.host = "db.internal"
+

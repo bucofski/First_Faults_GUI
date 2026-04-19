@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Top bar: refresh + selection -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Diagrams</h2>
+    <button class="btn btn-outline-secondary btn-sm" id="refresh-btn" onclick="location.reload()">
+        &#x21bb; Refresh
+    </button>
+</div>
+
+<!-- Month / Week selector -->
+<form method="GET" action="{{ url_for('plc.diagrams') }}" class="card card-body bg-light mb-4" id="diagram-form">
+    <div class="row g-3 align-items-end">
+        <div class="col-auto">
+            <label for="sel-month" class="form-label fw-bold">Month</label>
+            <select id="sel-month" name="month" class="form-select">
+                {% for val, label in months %}
+                <option value="{{ val }}" {% if val == selected_month %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <label for="sel-week" class="form-label fw-bold">Week of month</label>
+            <select id="sel-week" name="week" class="form-select">
+                {% for w in range(1, 6) %}
+                <option value="{{ w }}" {% if w == selected_week %}selected{% endif %}>Week {{ w }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary" id="apply-btn">Apply</button>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-outline-success" id="pdf-btn"
+                    data-pdf-url="{{ url_for('plc.diagrams_pdf', month=selected_month, week=selected_week) }}">
+                PDF
+            </button>
+        </div>
+        {% if selected_date %}
+        <div class="col-auto align-self-center">
+            <span class="badge bg-info text-dark">Selected start: {{ selected_date }}</span>
+        </div>
+        {% endif %}
+        <!-- preserve PLC selection if any -->
+        {% if selected_plc %}
+        <input type="hidden" name="plc" value="{{ selected_plc }}">
+        {% endif %}
+    </div>
+</form>
+
+<!-- Charts grid -->
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ chart_html|safe }}</div></div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ pie_html|safe }}</div></div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ chart_2_html|safe }}</div></div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ mtbf_html|safe }}</div></div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ long_html|safe }}</div></div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card"><div class="card-body">{{ repeat_offender|safe }}</div></div>
+    </div>
+</div>
+
+<!-- Heatmap (full width, needs PLC selector) -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('plc.diagrams') }}" class="row g-2 align-items-end mb-3" id="heatmap-form">
+            <!-- carry over month/week -->
+            <input type="hidden" name="month" value="{{ selected_month }}">
+            <input type="hidden" name="week" value="{{ selected_week }}">
+            <div class="col-auto">
+                <label for="sel-plc" class="form-label fw-bold">PLC for heatmap</label>
+                <select id="sel-plc" name="plc" class="form-select">
+                    <option value="">-- choose --</option>
+                    {% for p in plc_names %}
+                    <option value="{{ p }}" {% if p == selected_plc %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Show heatmap</button>
+            </div>
+        </form>
+        {% if heatmap_html %}
+            {{ heatmap_html|safe }}
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    document.getElementById("pdf-btn").addEventListener("click", async function () {
+        const btn = this;
+        const overlay = document.getElementById("global-loading-overlay");
+        const pdfUrl = btn.dataset.pdfUrl;
+
+        overlay.classList.add("active");
+        btn.disabled = true;
+
+        try {
+            const resp = await fetch(pdfUrl, { credentials: "same-origin" });
+            if (!resp.ok) {
+                throw new Error("PDF export failed (" + resp.status + ")");
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const cd = resp.headers.get("Content-Disposition") || "";
+            const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i);
+            a.download = m ? decodeURIComponent(m[1]) : "diagrams_export.pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error(e);
+            alert("Could not generate the PDF. Check server logs for details.");
+        } finally {
+            overlay.classList.remove("active");
+            btn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

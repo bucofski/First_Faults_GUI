@@ -1,0 +1,71 @@
+@startuml High-level Architecture
+
+skinparam componentStyle uml2
+skinparam backgroundColor white
+skinparam handwritten false
+
+title First_Faults_GUI - High-level Architectuur
+
+actor "Gebruiker" as user
+
+package "Presentation Layer" <<Frame>> #LightBlue {
+    [Flask Web App\n(plc.py)] as flask
+    [Templates (Jinja2)] as templates
+    [Static Assets] as static
+    [DiagramService] as diagram
+    [DiagramPdfService] as diagrampdf
+    [PdfGenerator] as pdf
+    [CredentialService] as cred
+}
+
+package "Business Layer" <<Frame>> #LightGreen {
+    [InterlockService\n(analyzer.py)] as analyzer
+    [FaultCountService] as faultcount
+    [TreeBuilder] as tree
+    [Formatters] as formatters
+    [MailService] as mail
+}
+
+package "Data Layer" <<Frame>> #LightYellow {
+    [InterlockRepository] as repo
+    [SnapshotRepository] as snaprepo
+    [DB Connection] as dbconn
+    [Domain Models] as models
+    [ORM (reporting_orm)] as orm
+}
+
+database "SQL Server" as db #LightGray
+
+' Connections
+user --> flask : HTTP Request
+flask --> templates : renders
+flask --> static : serves
+flask --> diagram : chart HTML
+flask --> analyzer : interlock analysis
+flask --> pdf : interlock PDF
+flask --> diagrampdf : diagrams PDF
+flask --> cred : authentication
+
+diagram --> snaprepo : read snapshots
+diagram --> faultcount : live fallback
+
+diagrampdf --> snaprepo : read snapshots
+diagrampdf --> faultcount : live fallback
+
+analyzer --> tree : builds trees
+analyzer --> formatters : formats output
+analyzer --> repo : fetches data
+analyzer --> models : creates
+
+faultcount --> repo : fetches data
+faultcount --> models : creates
+
+tree --> models : creates InterlockNode
+
+repo --> dbconn : connection
+repo --> models : maps to
+snaprepo --> dbconn : connection
+snaprepo --> orm : maps to
+dbconn --> db : SQL Queries
+
+@enduml
