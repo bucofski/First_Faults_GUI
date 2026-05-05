@@ -1,0 +1,500 @@
+"""
+Generate the First Faults GUI project presentation (.pptx).
+Run from the project root: python scripts/generate_presentation.py
+"""
+
+from pptx import Presentation
+from pptx.util import Inches, Pt, Emu
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches, Pt
+import os
+
+# ---------------------------------------------------------------------------
+# Colour palette (ArcelorMittal-inspired — steel blue + orange accent)
+# ---------------------------------------------------------------------------
+DARK_BG    = RGBColor(0x1A, 0x23, 0x3A)   # dark navy
+ACCENT     = RGBColor(0xE8, 0x6B, 0x1A)   # steel orange
+WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
+LIGHT_GREY = RGBColor(0xD0, 0xD8, 0xE8)
+MID_GREY   = RGBColor(0x6B, 0x7A, 0x99)
+GREEN_OK   = RGBColor(0x2E, 0xCC, 0x71)
+YELLOW_WIP = RGBColor(0xF3, 0x9C, 0x12)
+
+SLIDE_W = Inches(13.33)
+SLIDE_H = Inches(7.5)
+
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DOCS_DIR    = os.path.join(BASE_DIR, "docs")
+OUTPUT_PATH = os.path.join(BASE_DIR, "presentations", "FirstFaults_Presentation.pptx")
+
+os.makedirs(os.path.join(BASE_DIR, "presentations"), exist_ok=True)
+
+prs = Presentation()
+prs.slide_width  = SLIDE_W
+prs.slide_height = SLIDE_H
+
+BLANK = prs.slide_layouts[6]   # completely blank layout
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def add_rect(slide, l, t, w, h, fill_rgb, alpha=None):
+    shape = slide.shapes.add_shape(1, Inches(l), Inches(t), Inches(w), Inches(h))
+    shape.line.fill.background()
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = fill_rgb
+    return shape
+
+
+def add_text(slide, text, l, t, w, h, font_size=18, bold=False, color=WHITE,
+             align=PP_ALIGN.LEFT, italic=False, wrap=True):
+    txb = slide.shapes.add_textbox(Inches(l), Inches(t), Inches(w), Inches(h))
+    txb.word_wrap = wrap
+    tf = txb.text_frame
+    tf.word_wrap = wrap
+    p = tf.paragraphs[0]
+    p.alignment = align
+    run = p.add_run()
+    run.text = text
+    run.font.size  = Pt(font_size)
+    run.font.bold  = bold
+    run.font.color.rgb = color
+    run.font.italic = italic
+    return txb
+
+
+def add_para(tf, text, font_size=16, bold=False, color=WHITE,
+             align=PP_ALIGN.LEFT, italic=False, space_before=6):
+    p = tf.add_paragraph()
+    p.alignment = align
+    p.space_before = Pt(space_before)
+    run = p.add_run()
+    run.text = text
+    run.font.size  = Pt(font_size)
+    run.font.bold  = bold
+    run.font.color.rgb = color
+    run.font.italic = italic
+    return p
+
+
+def slide_base(title_text, subtitle_text=""):
+    """Dark background slide with header bar."""
+    slide = prs.slides.add_slide(BLANK)
+
+    # full background
+    add_rect(slide, 0, 0, 13.33, 7.5, DARK_BG)
+
+    # top accent bar
+    add_rect(slide, 0, 0, 13.33, 1.0, ACCENT)
+
+    # title in bar
+    add_text(slide, title_text,
+             l=0.35, t=0.08, w=10.5, h=0.85,
+             font_size=28, bold=True, color=WHITE)
+
+    # slide number indicator (small, top-right)
+    # subtitle below bar
+    if subtitle_text:
+        add_text(slide, subtitle_text,
+                 l=0.35, t=1.05, w=12.5, h=0.5,
+                 font_size=15, italic=True, color=LIGHT_GREY)
+
+    return slide
+
+
+def bullet_box(slide, l, t, w, h):
+    """Returns (shape, text_frame) for a bullet list box."""
+    txb = slide.shapes.add_textbox(Inches(l), Inches(t), Inches(w), Inches(h))
+    txb.word_wrap = True
+    tf = txb.text_frame
+    tf.word_wrap = True
+    # clear default empty paragraph
+    tf.paragraphs[0].text = ""
+    return txb, tf
+
+
+def section_label(slide, text, l=0.35, t=1.65):
+    add_rect(slide, l, t, 0.18, 0.38, ACCENT)
+    add_text(slide, text, l=l + 0.25, t=t, w=12, h=0.4,
+             font_size=18, bold=True, color=ACCENT)
+
+
+# ===========================================================================
+# Slide 1 — Title / Cover
+# ===========================================================================
+slide = prs.slides.add_slide(BLANK)
+add_rect(slide, 0, 0, 13.33, 7.5, DARK_BG)
+add_rect(slide, 0, 0, 13.33, 0.08, ACCENT)          # thin top line
+add_rect(slide, 0, 7.42, 13.33, 0.08, ACCENT)       # thin bottom line
+add_rect(slide, 0, 2.8, 13.33, 2.35, RGBColor(0x0D, 0x15, 0x26))  # dark band
+
+add_text(slide, "FIRST FAULTS GUI",
+         l=0.5, t=0.6, w=12.3, h=1.0,
+         font_size=46, bold=True, color=ACCENT, align=PP_ALIGN.CENTER)
+
+add_text(slide, "Historical Alarm Analysis & Reporting Platform",
+         l=0.5, t=1.55, w=12.3, h=0.6,
+         font_size=20, italic=True, color=LIGHT_GREY, align=PP_ALIGN.CENTER)
+
+add_text(slide, "Benoit Goethals  ·  Tom Van de Vyver",
+         l=0.5, t=2.95, w=12.3, h=0.55,
+         font_size=22, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+
+add_text(slide, "ArcelorMittal  ·  2025 – 2026",
+         l=0.5, t=3.5, w=12.3, h=0.45,
+         font_size=16, color=MID_GREY, align=PP_ALIGN.CENTER)
+
+add_text(slide, "10-minute project presentation",
+         l=0.5, t=6.8, w=12.3, h=0.45,
+         font_size=13, italic=True, color=MID_GREY, align=PP_ALIGN.CENTER)
+
+
+# ===========================================================================
+# Slide 2 — Agenda
+# ===========================================================================
+slide = slide_base("Agenda", "What we'll cover in 10 minutes")
+_, tf = bullet_box(slide, 0.6, 1.65, 11.8, 5.3)
+
+items = [
+    ("01", "Project description & problem statement"),
+    ("02", "Goals & success criteria"),
+    ("03", "Team & responsibilities"),
+    ("04", "Working style & methodology"),
+    ("05", "Architecture"),
+    ("06", "Key features walkthrough"),
+    ("07", "Progress timeline"),
+    ("08", "What's next"),
+]
+for num, label in items:
+    p = tf.add_paragraph()
+    p.space_before = Pt(4)
+    r1 = p.add_run()
+    r1.text = f"  {num}  "
+    r1.font.size  = Pt(17)
+    r1.font.bold  = True
+    r1.font.color.rgb = ACCENT
+    r2 = p.add_run()
+    r2.text = label
+    r2.font.size  = Pt(17)
+    r2.font.color.rgb = WHITE
+
+
+# ===========================================================================
+# Slide 3 — Project Description
+# ===========================================================================
+slide = slide_base("Project Description", "What problem are we solving?")
+
+add_rect(slide, 0.35, 1.65, 5.9, 5.35, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 6.55, 1.65, 6.43, 5.35, RGBColor(0x0D, 0x15, 0x26))
+
+section_label(slide, "The Problem", l=0.35, t=1.65)
+_, tf = bullet_box(slide, 0.55, 2.15, 5.6, 4.7)
+for line in [
+    "CIMPLICITY logs thousands of alarms per day on the ArcelorMittal production line",
+    "Existing tools only show real-time alarms — no historical analysis",
+    "Engineers cannot easily see which faults are trending upward",
+    "Finding the root cause of interlock chains is manual and time-consuming",
+    "No automated reporting or PDF exports for shift handover",
+]:
+    add_para(tf, f"›  {line}", font_size=14, color=LIGHT_GREY, space_before=8)
+
+section_label(slide, "Our Solution", l=6.55, t=1.65)
+_, tf = bullet_box(slide, 6.75, 2.15, 6.0, 4.7)
+for line in [
+    "Python / Flask web app served through IIS — no new login required",
+    "Interactive dashboard: 6 charts + heatmap from historical SQL Server data",
+    "Recursive interlock chain tracer: find the root fault in seconds",
+    "Weekly fault snapshots for long-term trend & regression detection",
+    "One-click PDF export for both the dashboard and the interlock tree",
+    "Sub-second queries via optimised SQL Server TVFs and indexes",
+]:
+    add_para(tf, f"›  {line}", font_size=14, color=LIGHT_GREY, space_before=8)
+
+
+# ===========================================================================
+# Slide 4 — Goals & Success Criteria
+# ===========================================================================
+slide = slide_base("Goals & Success Criteria", "What does 'done' look like?")
+
+goals = [
+    (GREEN_OK,   "DONE",  "DB connection via SQLAlchemy + pyodbc (SQL Server)"),
+    (GREEN_OK,   "DONE",  "Interlock chain tracing with recursive SQL function"),
+    (GREEN_OK,   "DONE",  "Diagrams dashboard: faults/hour, MTBF, top risers, heatmap …"),
+    (GREEN_OK,   "DONE",  "Collapsible interlock tree table with server-side filters"),
+    (GREEN_OK,   "DONE",  "PDF export — dashboard (6 charts) and interlock tree"),
+    (GREEN_OK,   "DONE",  "Weekly fault snapshots + historical reference-date picker"),
+    (GREEN_OK,   "DONE",  "Query performance: from ~8 s to < 1 s"),
+    (YELLOW_WIP, "WIP",   "Scheduled daily snapshot runs + automated weekly email report"),
+    (YELLOW_WIP, "WIP",   "Final IIS deployment + user acceptance test (target: 11 June 2026)"),
+    (YELLOW_WIP, "LATER", "Role-based access (read-only vs. admin configuration)"),
+    (YELLOW_WIP, "LATER", "Configurable alert thresholds with Teams/email notification"),
+]
+
+y = 1.65
+for color, tag, text in goals:
+    add_rect(slide, 0.35, y, 1.0, 0.36, color)
+    add_text(slide, tag, l=0.35, t=y, w=1.0, h=0.36,
+             font_size=11, bold=True, color=DARK_BG, align=PP_ALIGN.CENTER)
+    add_text(slide, text, l=1.5, t=y + 0.02, w=11.4, h=0.34,
+             font_size=13, color=WHITE if color == GREEN_OK else LIGHT_GREY)
+    y += 0.44
+
+
+# ===========================================================================
+# Slide 5 — Team & Responsibilities
+# ===========================================================================
+slide = slide_base("Team & Responsibilities")
+
+# Benoit card
+add_rect(slide, 0.35, 1.65, 5.9, 5.2, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 0.35, 1.65, 5.9, 0.55, ACCENT)
+add_text(slide, "Benoit Goethals", l=0.5, t=1.68, w=5.6, h=0.48,
+         font_size=20, bold=True, color=WHITE)
+_, tf = bullet_box(slide, 0.55, 2.35, 5.5, 4.3)
+for item in [
+    "Frontend — UI design, Jinja2 templates, Bootstrap 5 layout",
+    "Visualisations — Plotly charts (bar, pie, heatmap)",
+    "Flask routes, Blueprint structure, form handling",
+    "PDF export — DiagramPdfService, Kaleido + ReportLab",
+    "JavaScript: collapsible tree, async PDF download, global spinner",
+    "Documentation: README, CHANGELOG, PROJECT_PROGRESS, architecture docs",
+    "Performance: query rewrites and DB index tuning",
+]:
+    add_para(tf, f"·  {item}", font_size=13, color=LIGHT_GREY, space_before=7)
+
+# Tom card
+add_rect(slide, 6.55, 1.65, 6.43, 5.2, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 6.55, 1.65, 6.43, 0.55, RGBColor(0x14, 0x5A, 0x8A))
+add_text(slide, "Tom Van de Vyver", l=6.7, t=1.68, w=6.1, h=0.48,
+         font_size=20, bold=True, color=WHITE)
+_, tf = bullet_box(slide, 6.75, 2.35, 6.0, 4.3)
+for item in [
+    "Backend — database design and normalisation",
+    "SQL Server: TVFs, stored procedures, views, indexes",
+    "SQLAlchemy ORM models and repository layer",
+    "InterlockService: root-cause chain analysis engine",
+    "Snapshot system: weekly fault snapshots + backfill scripts",
+    "MailService: SMTP-based automated email reports",
+    "DB migration scripts and validation tooling",
+]:
+    add_para(tf, f"·  {item}", font_size=13, color=LIGHT_GREY, space_before=7)
+
+
+# ===========================================================================
+# Slide 6 — Working Style
+# ===========================================================================
+slide = slide_base("Working Style & Methodology")
+
+cols = [
+    ("Git Flow",
+     ["main  →  Develop  →  feature branches",
+      "Pull requests for every feature (50+ PRs merged)",
+      "Branch names follow GitHub issue numbers",
+      "No direct commits to Develop"]),
+    ("Agile Iterations",
+     ["Short cycles: build → test → review → merge",
+      "Priorities shift based on user feedback from engineers",
+      "Weekly sync between Benoit and Tom",
+      "Progress reported monthly to stakeholders"]),
+    ("Quality Practices",
+     ["SQLAlchemy 2.0 compliance enforced throughout",
+      "SOLID principles applied to service layer",
+      "Logging added at service boundaries for traceability",
+      "SQL scripts tested in isolation before integration"]),
+    ("Tooling",
+     ["PyCharm (IDE)  ·  GitHub (versioning & PRs)",
+      "Flask dev server for local testing",
+      "IIS as production run environment",
+      "Plotly + Kaleido for chart-to-PNG rendering"]),
+]
+
+x_positions = [0.35, 3.5, 6.65, 9.8]
+for i, (title, bullets) in enumerate(cols):
+    x = x_positions[i]
+    add_rect(slide, x, 1.65, 3.1, 5.35, RGBColor(0x0D, 0x15, 0x26))
+    add_rect(slide, x, 1.65, 3.1, 0.5, ACCENT if i % 2 == 0 else RGBColor(0x14, 0x5A, 0x8A))
+    add_text(slide, title, l=x + 0.1, t=1.68, w=2.9, h=0.45,
+             font_size=15, bold=True, color=WHITE)
+    _, tf = bullet_box(slide, x + 0.1, 2.28, 2.9, 4.5)
+    for b in bullets:
+        add_para(tf, f"·  {b}", font_size=12, color=LIGHT_GREY, space_before=9)
+
+
+# ===========================================================================
+# Slide 7 — Architecture
+# ===========================================================================
+slide = slide_base("Architecture", "Three-tier Flask application on IIS")
+
+arch_img = os.path.join(DOCS_DIR, "HighLevelArchitectureDiagram.png")
+if os.path.exists(arch_img):
+    slide.shapes.add_picture(arch_img, Inches(0.35), Inches(1.65),
+                             width=Inches(7.5), height=Inches(5.3))
+
+# legend / summary on right
+add_rect(slide, 8.05, 1.65, 5.0, 5.3, RGBColor(0x0D, 0x15, 0x26))
+_, tf = bullet_box(slide, 8.2, 1.75, 4.7, 5.0)
+
+layers = [
+    ("Presentation layer", "Flask Blueprints · Jinja2 templates · Bootstrap 5"),
+    ("Business layer",     "InterlockService · FaultCountService"),
+    ("Data layer",         "SQLAlchemy ORM · SnapshotRepository · DB_Connection"),
+    ("Database",           "SQL Server via pyodbc · TVFs · Views · Indexes"),
+    ("Export",             "ReportLab PDF · Plotly + Kaleido PNG"),
+    ("Auth",               "IIS Windows Authentication — no custom login"),
+    ("Config",             "TOML config file loaded at startup"),
+]
+for layer, detail in layers:
+    p = tf.add_paragraph()
+    p.space_before = Pt(8)
+    r1 = p.add_run()
+    r1.text = f"{layer}\n"
+    r1.font.size  = Pt(13)
+    r1.font.bold  = True
+    r1.font.color.rgb = ACCENT
+    r2 = p.add_run()
+    r2.text = detail
+    r2.font.size  = Pt(11)
+    r2.font.color.rgb = LIGHT_GREY
+
+add_text(slide, "SQL Server  →  Repository  →  Service  →  Template  →  Browser",
+         l=8.2, t=6.6, w=4.7, h=0.35,
+         font_size=10, italic=True, color=MID_GREY)
+
+
+# ===========================================================================
+# Slide 8 — Key Features
+# ===========================================================================
+slide = slide_base("Key Features", "What the application delivers")
+
+features = [
+    ("Diagrams Dashboard",
+     "/plc/diagrams",
+     ["Faults per hour (bar chart)",
+      "Faults per PLC — pie chart",
+      "Top risers (week-over-week climbing faults)",
+      "MTBF per PLC",
+      "Top 10 climbing faults",
+      "Repeat offenders (max occurrences per hour)",
+      "Heatmap: hour × day per selected PLC",
+      "Historical week/month picker via reference date"]),
+    ("Interlock Tree",
+     "/plc/table-tree",
+     ["Recursive fault-chain tracer in SQL",
+      "Filters: Target BSID, Top N, PLC, time range, condition mnemonic",
+      "Collapsible tree rows — expand/collapse per node",
+      "POST-redirect-GET pattern prevents double-submit",
+      "Server-side validation with flash messages"]),
+    ("PDF Exports",
+     "/plc/diagrams-pdf  &  table-tree PDF",
+     ["All 6 dashboard charts → PNG (Kaleido) → landscape PDF (ReportLab)",
+      "Interlock tree exported as formatted PDF table",
+      "Async download via fetch — no page reload",
+      "Global loading spinner shown during generation"]),
+    ("Snapshot & Reporting",
+     "run_daily_snapshot.py",
+     ["Weekly fault count snapshots stored in DB",
+      "Backfill support across multiple production databases",
+      "Long-term regression view: compare trends over months",
+      "MailService ready for automated weekly email delivery"]),
+]
+
+x_pos = [0.35, 3.5, 6.65, 9.8]
+for i, (title, route, bullets) in enumerate(features):
+    x = x_pos[i]
+    add_rect(slide, x, 1.65, 3.1, 5.35, RGBColor(0x0D, 0x15, 0x26))
+    add_rect(slide, x, 1.65, 3.1, 0.45, ACCENT if i % 2 == 0 else RGBColor(0x14, 0x5A, 0x8A))
+    add_text(slide, title, l=x + 0.1, t=1.67, w=2.9, h=0.4,
+             font_size=14, bold=True, color=WHITE)
+    add_text(slide, route, l=x + 0.1, t=2.15, w=2.9, h=0.3,
+             font_size=10, italic=True, color=ACCENT)
+    _, tf = bullet_box(slide, x + 0.1, 2.5, 2.9, 4.3)
+    for b in bullets:
+        add_para(tf, f"·  {b}", font_size=11, color=LIGHT_GREY, space_before=7)
+
+
+# ===========================================================================
+# Slide 9 — Progress Timeline
+# ===========================================================================
+slide = slide_base("Progress Timeline", "November 2025 → May 2026")
+
+phases = [
+    ("Nov 2025",      ACCENT,                    "Phase 1 — Setup & PoC",
+     "Flask app · Blueprint routing · Plotly charts · Tree table · IIS auth"),
+    ("Nov–Dec 2025",  RGBColor(0x14, 0x5A, 0x8A), "Phase 2 — Interlock Engine",
+     "SQLAlchemy ORM · Recursive SQL chain tracer · PDF export · Snapshots · MailService"),
+    ("Feb 2026",      RGBColor(0x27, 0x6E, 0x48), "Phase 3 — Stability",
+     "InterlockService rename · SQL views · Migration validation tooling"),
+    ("Apr 2026",      RGBColor(0x7D, 0x3C, 0x98), "Phase 4 — Dashboard & Performance",
+     "6-chart dashboard · DiagramPdfService · Reference-date picker · 8 s → < 1 s query time · DB indexes"),
+    ("May 2026",      MID_GREY,                  "Now — Polish",
+     "Pie chart on home · Subtree toggle refactor · PDF null-fix · Documentation"),
+]
+
+y = 1.65
+for date, color, title, detail in phases:
+    add_rect(slide, 0.35, y, 1.6, 0.88, color)
+    add_text(slide, date, l=0.35, t=y + 0.22, w=1.6, h=0.44,
+             font_size=12, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+    add_rect(slide, 2.1, y + 0.34, 10.88, 0.04, color)  # connector line
+    add_rect(slide, 2.1, y, 10.88, 0.88, RGBColor(0x0D, 0x15, 0x26))
+    add_text(slide, title, l=2.25, t=y + 0.02, w=10.5, h=0.4,
+             font_size=14, bold=True, color=color)
+    add_text(slide, detail, l=2.25, t=y + 0.42, w=10.5, h=0.42,
+             font_size=12, color=LIGHT_GREY)
+    y += 1.02
+
+
+# ===========================================================================
+# Slide 10 — What's Next & Closing
+# ===========================================================================
+slide = slide_base("What's Next", "Road to MVP — 11 June 2026")
+
+add_rect(slide, 0.35, 1.65, 6.3, 4.0, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 0.35, 1.65, 6.3, 0.45, ACCENT)
+add_text(slide, "Before MVP (June 11)", l=0.5, t=1.67, w=6.0, h=0.4,
+         font_size=15, bold=True, color=WHITE)
+_, tf = bullet_box(slide, 0.55, 2.2, 5.9, 3.3)
+for item in [
+    "Schedule daily snapshot runs (Windows Task Scheduler / IIS)",
+    "Wire MailService to automated weekly PDF email",
+    "Final IIS deployment on production server",
+    "User acceptance test with ArcelorMittal engineers",
+    "About & Contact pages with real contact details",
+    "End-to-end test pass: all pages, filters, PDF downloads",
+]:
+    add_para(tf, f"›  {item}", font_size=13, color=LIGHT_GREY, space_before=7)
+
+add_rect(slide, 6.85, 1.65, 6.13, 4.0, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 6.85, 1.65, 6.13, 0.45, RGBColor(0x14, 0x5A, 0x8A))
+add_text(slide, "Post-MVP Ambitions", l=7.0, t=1.67, w=5.8, h=0.4,
+         font_size=15, bold=True, color=WHITE)
+_, tf = bullet_box(slide, 7.05, 2.2, 5.7, 3.3)
+for item in [
+    "Role-based access: read-only vs. admin",
+    "Configurable alert thresholds with email/Teams notifications",
+    "Extended heatmap: drill-down to individual fault codes",
+    "Promote ML fault prediction to production",
+    "Multi-site support (multiple CIMPLICITY instances)",
+    "REST API so other tools can query fault trends",
+]:
+    add_para(tf, f"›  {item}", font_size=13, color=LIGHT_GREY, space_before=7)
+
+# Closing banner
+add_rect(slide, 0.35, 5.85, 12.63, 1.3, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 0.35, 5.85, 12.63, 0.06, ACCENT)
+add_text(slide, "Thank you for your attention — questions welcome",
+         l=0.5, t=6.1, w=12.3, h=0.6,
+         font_size=22, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+add_text(slide, "Benoit Goethals · Tom Van de Vyver  |  ArcelorMittal  ·  2025–2026",
+         l=0.5, t=6.7, w=12.3, h=0.35,
+         font_size=13, italic=True, color=MID_GREY, align=PP_ALIGN.CENTER)
+
+
+# ---------------------------------------------------------------------------
+# Save
+# ---------------------------------------------------------------------------
+prs.save(OUTPUT_PATH)
+print(f"Saved: {OUTPUT_PATH}")
