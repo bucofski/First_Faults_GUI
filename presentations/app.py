@@ -3,6 +3,8 @@ import tomllib
 from pathlib import Path
 
 from flask import Flask, render_template, url_for, redirect, session
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 
 from config.logging_config import setup_logging
 from presentations.routes import plc_routes
@@ -19,6 +21,19 @@ def create_app() -> Flask:
     app = Flask("app")
     app.secret_key = "dev"
     app.jinja_options["autoescape"] = True
+
+    csrf = CSRFProtect(app)
+
+    @app.errorhandler(CSRFError)
+    def _csrf_error(e):
+        logging.getLogger("security").warning("CSRF_FAIL reason=%s", e.description)
+        return render_template(
+            "error.html", title="Error",
+            error_code=400,
+            error_title="Bad Request",
+            error_message="CSRF validation failed. Please reload and try again.",
+        ), 400
+
     app.register_blueprint(plc_routes.bp)
 
     config_path = (Path(__file__).resolve().parent.parent / "config" / "config.toml")

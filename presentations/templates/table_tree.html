@@ -16,6 +16,7 @@
 
 <!-- Filter form -->
 <form method="POST" action="{{ url_for('plc.table_tree') }}" class="card card-body bg-light mb-4" id="bsid-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row g-3 align-items-end">
         <div class="col-md-2 col-sm-4">
             <label for="target_bsid" class="form-label fw-bold">Target BSID</label>
