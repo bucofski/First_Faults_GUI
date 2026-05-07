@@ -36,6 +36,34 @@ def create_app() -> Flask:
     server_cfg = loaded.get("server", {})
     app.config["SERVER_HOST"] = server_cfg.get("host", "127.0.0.1")
     app.config["SERVER_PORT"] = server_cfg.get("port", 5000)
+    app.config["FORCE_HTTPS"] = bool(server_cfg.get("force_https", False))
+
+    @app.after_request
+    def set_security_headers(response):
+        # Conservative CSP: allow self + inline (Plotly chart HTML uses inline scripts/styles).
+        # Tighten by adding a per-request nonce when the chart pipeline supports it.
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plot.ly; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "font-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'",
+        )
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        if app.config.get("FORCE_HTTPS"):
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        return response
 
     @app.before_request
     def ensure_session_credentials():
