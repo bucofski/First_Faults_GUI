@@ -1,10 +1,11 @@
 """Centralised logging configuration.
 
-Four rotating log files:
+Five rotating log files:
   logs/app.log         — general application errors (config, startup, etc.)
   logs/repository.log  — errors from data.repositories.*
   logs/flask.log       — errors from Flask / werkzeug / presentation layer
   logs/auth.log        — credential / login events
+  logs/security.log    — security-relevant events (authz denials, suspicious input)
 """
 
 import logging
@@ -56,3 +57,10 @@ def setup_logging() -> None:
     auth_logger = logging.getLogger("auth")
     auth_logger.setLevel(logging.INFO)
     auth_logger.addHandler(_make_handler("auth.log", logging.INFO))
+    auth_logger.propagate = False
+
+    # 4) Security events (authz denials, suspicious input, rate-limit hits) → logs/security.log
+    sec_logger = logging.getLogger("security")
+    sec_logger.setLevel(logging.INFO)
+    sec_logger.addHandler(_make_handler("security.log", logging.INFO))
+    sec_logger.propagate = False

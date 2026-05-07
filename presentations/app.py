@@ -2,7 +2,7 @@ import logging
 import tomllib
 from pathlib import Path
 
-from flask import Flask, render_template, url_for, redirect, session
+from flask import Flask, render_template, request, url_for, redirect, session
 
 from config.logging_config import setup_logging
 from presentations.routes import plc_routes
@@ -11,6 +11,7 @@ from presentations.services.credential_service import CredentialService
 
 _auth_log = logging.getLogger("auth")
 _app_log = logging.getLogger("presentations")
+_sec_log = logging.getLogger("security")
 
 
 def create_app() -> Flask:
@@ -48,6 +49,25 @@ def create_app() -> Flask:
             if is_new_session:
                 _auth_log.info("Session started: user=%s role=%s", cred.username, session["role"])
 
+    def _client_ip() -> str:
+        # Honour X-Forwarded-For only if app.config["TRUST_PROXY"] is true.
+        if app.config.get("TRUST_PROXY") and request.headers.get("X-Forwarded-For"):
+            return request.headers["X-Forwarded-For"].split(",")[0].strip()
+        return request.remote_addr or "-"
+
+    @app.errorhandler(403)
+    def forbidden(e):
+        _sec_log.warning(
+            "AUTHZ_DENY ip=%s user=%s path=%s method=%s",
+            _client_ip(), session.get("username", "-"), request.path, request.method,
+        )
+        return render_template(
+            "error.html", title="Error",
+            error_code=403,
+            error_title="Forbidden",
+            error_message="You do not have permission to access this resource.",
+        ), 403
+
     @app.errorhandler(404)
     def not_found(e):
         return render_template(
@@ -59,6 +79,10 @@ def create_app() -> Flask:
 
     @app.errorhandler(500)
     def internal_error(e):
+        _sec_log.error(
+            "SERVER_ERROR ip=%s user=%s path=%s method=%s",
+            _client_ip(), session.get("username", "-"), request.path, request.method,
+        )
         app.logger.error("Internal server error: %s", e, exc_info=True)
         return render_template(
             "error.html", title="Error",
