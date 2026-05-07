@@ -1,0 +1,47 @@
+name: security-audit
+
+on:
+  push:
+    branches: [Develop, main]
+  pull_request:
+    branches: [Develop, main]
+  schedule:
+    - cron: "0 6 * * 1"  # weekly Monday 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+
+      - name: Audit dependencies (pyproject.toml)
+        run: pip-audit --strict --disable-pip --progress-spinner off .
+
+  bandit:
+    name: bandit (static analysis)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install bandit
+        run: python -m pip install --upgrade pip bandit
+
+      - name: Run bandit
+        run: bandit -r business config data presentations scripts -ll
