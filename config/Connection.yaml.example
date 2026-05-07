@@ -1,0 +1,9 @@
+DBconnection:
+  server: 192.168.0.30
+  port: 1433
+  database: First_Fault
+  username: REPLACE_ME
+  password: REPLACE_ME
+  driver: ODBC Driver 18 for SQL Server
+  encrypt: true
+  trust_server_certificate: false

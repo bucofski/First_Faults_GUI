@@ -166,12 +166,16 @@ class MailService:
 
 
 if __name__ == "__main__":
+    import os
+
     cfg = SmtpConfig(
-        host="192.168.0.174",
-        port=25,
-        username="benoit",
-        password="R@nger&1401!",
-        sender_email="benoit@albatros.be",
+        host=os.environ["SMTP_HOST"],
+        port=int(os.environ.get("SMTP_PORT", "25")),
+        username=os.environ.get("SMTP_USERNAME"),
+        password=os.environ.get("SMTP_PASSWORD"),
+        use_tls=os.environ.get("SMTP_USE_TLS", "false").lower() in ("1", "true", "yes"),
+        use_ssl=os.environ.get("SMTP_USE_SSL", "false").lower() in ("1", "true", "yes"),
+        sender_email=os.environ.get("SMTP_SENDER_EMAIL"),
     )
     ms = MailService(cfg)
     start_dt = datetime.now() + timedelta(days=1)

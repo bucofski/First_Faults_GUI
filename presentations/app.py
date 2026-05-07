@@ -1,4 +1,6 @@
 import logging
+import os
+import secrets
 import tomllib
 from pathlib import Path
 
@@ -17,7 +19,16 @@ def create_app() -> Flask:
     setup_logging()
 
     app = Flask("app")
-    app.secret_key = "dev"
+    secret_key = os.environ.get("FLASK_SECRET_KEY")
+    if not secret_key:
+        if os.environ.get("FLASK_ENV") == "production":
+            raise RuntimeError(
+                "FLASK_SECRET_KEY must be set in production. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
+        secret_key = secrets.token_hex(32)
+        _app_log.warning("FLASK_SECRET_KEY not set; generated an ephemeral key for this process only")
+    app.secret_key = secret_key
     app.jinja_options["autoescape"] = True
     app.register_blueprint(plc_routes.bp)
 

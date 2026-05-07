@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from contextlib import contextmanager
 from urllib.parse import quote_plus
@@ -25,19 +26,57 @@ class Base(DeclarativeBase):
 # ============================================================================
 # Configuration Loader
 # ============================================================================
+_ENV_OVERRIDES = {
+    "server": "DB_SERVER",
+    "port": "DB_PORT",
+    "database": "DB_NAME",
+    "username": "DB_USERNAME",
+    "password": "DB_PASSWORD",
+    "driver": "DB_DRIVER",
+    "encrypt": "DB_ENCRYPT",
+    "trust_server_certificate": "DB_TRUST_SERVER_CERT",
+}
+
+
+def _coerce(key: str, value: str):
+    if key == "port":
+        return int(value)
+    if key in ("encrypt", "trust_server_certificate"):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return value
+
+
 def load_db_config(config_path: Path | None = None) -> dict:
-    """Load database configuration from YAML file."""
+    """Load database configuration.
+
+    Resolution order per field: environment variable → YAML file → KeyError.
+    Credentials should be supplied via env vars in production; the YAML file
+    is convenient for local development only.
+    """
     path = config_path or CONFIG_PATH
-    try:
-        with open(path, "r") as file:
-            config = yaml.safe_load(file)
-        return config["DBconnection"]
-    except FileNotFoundError:
-        logger.error("Database config not found: %s", path)
-        raise
-    except (yaml.YAMLError, KeyError, TypeError) as e:
-        logger.error("Invalid database config in %s: %s", path, e)
-        raise
+    config: dict = {}
+    if path.exists():
+        try:
+            with open(path, "r") as file:
+                loaded = yaml.safe_load(file) or {}
+            config = loaded.get("DBconnection", {}) or {}
+        except (yaml.YAMLError, TypeError) as e:
+            logger.error("Invalid database config in %s: %s", path, e)
+            raise
+
+    for key, env_name in _ENV_OVERRIDES.items():
+        env_val = os.environ.get(env_name)
+        if env_val is not None and env_val != "":
+            config[key] = _coerce(key, env_val)
+
+    missing = [k for k in ("server", "database", "username", "password", "driver") if not config.get(k)]
+    if missing:
+        raise KeyError(
+            f"Missing required DB config keys: {missing}. "
+            f"Set via env ({', '.join(_ENV_OVERRIDES[k] for k in missing)}) "
+            f"or {path}."
+        )
+    return config
 
 
 # ============================================================================
@@ -51,8 +90,8 @@ def _build_odbc_connect_string(conn_config: dict) -> str:
         f"DATABASE={conn_config['database']}",
         f"UID={conn_config['username']}",
         f"PWD={conn_config['password']}",
-        f"Encrypt={'yes' if conn_config.get('encrypt', False) else 'no'}",
-        f"TrustServerCertificate={'yes' if conn_config.get('trust_server_certificate', True) else 'no'}",
+        f"Encrypt={'yes' if conn_config.get('encrypt', True) else 'no'}",
+        f"TrustServerCertificate={'yes' if conn_config.get('trust_server_certificate', False) else 'no'}",
         "MARS_Connection=yes",
     ]
     return ";".join(parts)
