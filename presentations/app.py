@@ -1,24 +1,28 @@
 import logging
+import os
 import tomllib
 from pathlib import Path
 
 from flask import Flask, render_template, url_for, redirect, session
 
 from config.logging_config import setup_logging
-from presentations.routes import plc_routes
-from presentations.services.creadential import Role
-from presentations.services.credential_service import CredentialService
+from presentations.routes import auth_routes, plc_routes
+from presentations.services.auth import current_user, login_required
 
-_auth_log = logging.getLogger("auth")
 _app_log = logging.getLogger("presentations")
 
 
 def create_app() -> Flask:
     setup_logging()
 
-    app = Flask("app")
+    app = Flask(__name__)
     app.secret_key = "dev"
     app.jinja_options["autoescape"] = True
+
+    # Gate every plc.* route behind authentication. Auth blueprint stays public.
+    plc_routes.bp.before_request(login_required(lambda: None))
+
+    app.register_blueprint(auth_routes.bp)
     app.register_blueprint(plc_routes.bp)
 
     config_path = (Path(__file__).resolve().parent.parent / "config" / "config.toml")
@@ -37,16 +41,16 @@ def create_app() -> Flask:
     app.config["SERVER_HOST"] = server_cfg.get("host", "127.0.0.1")
     app.config["SERVER_PORT"] = server_cfg.get("port", 5000)
 
-    @app.before_request
-    def ensure_session_credentials():
-        cred = CredentialService.get_current_credential()
-        if cred is not None:
-            is_new_session = "username" not in session
-            session["username"] = cred.username
-            role_obj = cred.role
-            session["role"] = role_obj.value if role_obj is not None else Role.GUEST.value
-            if is_new_session:
-                _auth_log.info("Session started: user=%s role=%s", cred.username, session["role"])
+    def _csrf_token() -> str:
+        if "_csrf_token" not in session:
+            session["_csrf_token"] = os.urandom(32).hex()
+        return session["_csrf_token"]
+
+    app.jinja_env.globals["csrf_token"] = _csrf_token
+
+    @app.context_processor
+    def inject_user():
+        return {"current_user": current_user()}
 
     @app.errorhandler(404)
     def not_found(e):
