@@ -40,9 +40,17 @@
                                         href="{{ url_for('plc.contact') }}">Contact</a></li>
 
             </ul>
-            <span class="navbar-text ms-auto">
-            user : {{ session.username or 'Guest' }} &nbsp; Role : {{ session.role or 'GUEST' }}
-          </span>
+            <div class="d-flex align-items-center ms-auto gap-3">
+                <span class="navbar-text">
+                    user : {{ session.username or 'Guest' }} &nbsp; Role : {{ session.role or 'GUEST' }}
+                </span>
+                {% if session.username %}
+                <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+                </form>
+                {% endif %}
+            </div>
         </div>
 
     </div>
