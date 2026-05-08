@@ -1,8 +1,9 @@
 import logging
+import os
 import tomllib
 from pathlib import Path
 
-from flask import Flask, render_template, url_for, redirect
+from flask import Flask, render_template, url_for, redirect, session
 
 from config.logging_config import setup_logging
 from presentations.routes import auth_routes, plc_routes
@@ -14,7 +15,7 @@ _app_log = logging.getLogger("presentations")
 def create_app() -> Flask:
     setup_logging()
 
-    app = Flask("app")
+    app = Flask(__name__)
     app.secret_key = "dev"
     app.jinja_options["autoescape"] = True
 
@@ -39,6 +40,13 @@ def create_app() -> Flask:
     server_cfg = loaded.get("server", {})
     app.config["SERVER_HOST"] = server_cfg.get("host", "127.0.0.1")
     app.config["SERVER_PORT"] = server_cfg.get("port", 5000)
+
+    def _csrf_token() -> str:
+        if "_csrf_token" not in session:
+            session["_csrf_token"] = os.urandom(32).hex()
+        return session["_csrf_token"]
+
+    app.jinja_env.globals["csrf_token"] = _csrf_token
 
     @app.context_processor
     def inject_user():

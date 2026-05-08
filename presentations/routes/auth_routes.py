@@ -1,4 +1,4 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 
 from presentations.services.auth import (
     authenticate,
@@ -13,6 +13,10 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        submitted = request.form.get("csrf_token", "")
+        expected = session.get("_csrf_token", "")
+        if not submitted or submitted != expected:
+            abort(400)
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = authenticate(username, password)
