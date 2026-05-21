@@ -11,11 +11,23 @@ _APP_NAME = "First Faults GUI"
 
 
 def init_oauth(app):
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise RuntimeError(
+            "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set. "
+            "See https://console.cloud.google.com/apis/credentials"
+        )
+
+    # Allow http://localhost during local development.
+    # Remove this line (or unset the env var) in production.
+    os.environ.setdefault("AUTHLIB_INSECURE_TRANSPORT", "1")
+
     _oauth.init_app(app)
     _oauth.register(
         name="google",
-        client_id=os.environ["GOOGLE_CLIENT_ID"],
-        client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
+        client_id=client_id,
+        client_secret=client_secret,
         server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
         client_kwargs={"scope": "openid email profile"},
     )
