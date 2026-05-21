@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h3 class="card-title text-center mb-1">Two-factor authentication</h3>
+        <p class="text-center text-muted mb-4" style="font-size:.9rem;">
+          Open your authenticator app and enter the 6-digit code.
+        </p>
+
+        {% with messages = get_flashed_messages(category_filter=["error"]) %}
+          {% for msg in messages %}
+            <div class="alert alert-danger">{{ msg }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="totp_code">Verification code</label>
+            <input autocomplete="one-time-code" autofocus class="form-control form-control-lg text-center"
+                   id="totp_code" inputmode="numeric" maxlength="6" minlength="6"
+                   name="totp_code" pattern="\d{6}" placeholder="000000" required type="text">
+          </div>
+          <div class="d-grid">
+            <button class="btn btn-primary btn-lg" type="submit">Verify</button>
+          </div>
+        </form>
+
+        <div class="text-center mt-3">
+          <a class="text-muted" href="{{ url_for('auth.logout') }}" style="font-size:.85rem;">
+            Use a different account
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

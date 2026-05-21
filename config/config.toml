@@ -36,6 +36,11 @@ enable_tracing = false
 # Prefer environment variables, but allow defaults:
 jwt_secret = "${JWT_SECRET:-change-me}"
 
+[oauth.google]
+# Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as environment variables.
+# Obtain credentials at https://console.cloud.google.com/apis/credentials
+# Authorised redirect URI: http://localhost:8080/auth/callback
+
 [env.dev]
 server.debug = true
 logging.level = "DEBUG"

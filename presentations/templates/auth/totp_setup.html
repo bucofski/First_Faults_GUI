@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h3 class="card-title text-center mb-1">Set up two-factor authentication</h3>
+        <p class="text-center text-muted mb-4" style="font-size:.9rem;">
+          Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)
+        </p>
+
+        {% with messages = get_flashed_messages(category_filter=["error"]) %}
+          {% for msg in messages %}
+            <div class="alert alert-danger">{{ msg }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <div class="text-center mb-3">
+          <img alt="TOTP QR code" class="img-fluid border rounded p-1"
+               src="data:image/png;base64,{{ qr_data }}" style="max-width:220px;">
+        </div>
+
+        <details class="mb-3">
+          <summary class="text-muted" style="font-size:.85rem; cursor:pointer;">Can't scan? Enter the key manually</summary>
+          <code class="d-block mt-2 text-center text-break">{{ secret }}</code>
+        </details>
+
+        <form method="post">
+          <input name="csrf_token" type="hidden" value="{{ session.get('_csrf_token', '') }}">
+          <div class="mb-3">
+            <label class="form-label" for="totp_code">Enter the 6-digit code from your app</label>
+            <input autocomplete="one-time-code" autofocus class="form-control form-control-lg text-center"
+                   id="totp_code" inputmode="numeric" maxlength="6" minlength="6"
+                   name="totp_code" pattern="\d{6}" placeholder="000000" required type="text">
+          </div>
+          <div class="d-grid">
+            <button class="btn btn-primary btn-lg" type="submit">Verify and activate</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -15,6 +15,7 @@ from business.core.fault_count_service import FaultCountService
 
 from presentations.services.pdf_generator import PdfGenerator
 from presentations.services.diagram_pdf_service import DiagramPdfService
+from presentations.routes.auth_routes import login_required
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
 service_interlock = InterlockService()
@@ -112,6 +113,7 @@ def _parse_table_tree_filters_or_redirect(*, redirect_endpoint: str):
 
 
 @bp.route("/")
+@login_required
 def home():
     today = dt.date.today()
     selected_date = today - dt.timedelta(days=today.weekday() + 7)
@@ -126,16 +128,19 @@ def home():
 
 
 @bp.route("/table")
+@login_required
 def table():
     return render_template("table.html", title="Table", data=None)
 
 
 @bp.route("/about")
+@login_required
 def about():
     return render_template("about.html", title="About")
 
 
 @bp.route("/contact")
+@login_required
 def contact():
     return render_template("contact.html", title="Contact")
 
@@ -160,6 +165,7 @@ def _first_monday_of_month_week(year: int, month: int, week: int) -> dt.date:
 
 
 @bp.route("/diagrams")
+@login_required
 def diagrams():
     selected_plc = request.args.get("plc", "").strip() or None
     plc_names    = _fault_count_service.get_all_plc_names()
@@ -203,6 +209,7 @@ def diagrams():
 
 
 @bp.route("/diagrams-pdf")
+@login_required
 def diagrams_pdf():
     now = dt.date.today()
     selected_month = request.args.get("month", type=int, default=now.month)
@@ -219,6 +226,7 @@ def diagrams_pdf():
 
 
 @bp.route("/pdf-table_tree_export-tree", methods=["POST"])
+@login_required
 def table_tree_export():
     parsed = _parse_table_tree_filters_or_redirect(redirect_endpoint="plc.table_tree")
     if not isinstance(parsed, tuple):
@@ -237,6 +245,7 @@ def table_tree_export():
 
 
 @bp.route("/table-tree", methods=["GET", "POST"])
+@login_required
 def table_tree():
     if request.method == "POST":
         parsed = _parse_table_tree_filters_or_redirect(redirect_endpoint="plc.table_tree")
