@@ -16,7 +16,7 @@ _app_log = logging.getLogger("presentations")
 def create_app() -> Flask:
     setup_logging()
 
-    app = Flask("app")
+    app = Flask(__name__)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-in-prod")
     app.jinja_options["autoescape"] = True
     app.register_blueprint(auth_routes.bp)
