@@ -6,5 +6,11 @@
   "tom": {
     "password_hash": "scrypt:32768:8:1$QFBwA4SaTNGvhaX4$0d4fd177d35fbbc9876710bab52b9f620a51ca27e6b93dc3cf85dcacfa598ac23831eb4413fb77879810fb6bb3f7344c9eb94df1c445f7018949b08e0717926a",
     "role": "admin"
+  },
+
+  "ben": {
+    "password_hash": "scrypt:32768:8:1$8WvVcUfVlQW4EteT$864f44ad3a608e09e2c16a38041fe2cc7d267b2a3bb831e77975588782e15cdddd8d67a50d5fb161ca960bd8cb07c8aaec000de105dd1dfde510b4d3405a7e8e",
+    "role": "admin"
   }
+
 }

@@ -36,7 +36,7 @@ Regeltechniekers, lijnverantwoordelijken, productiebedienden bij Arcelor die CIM
 - **Database:** SQL Server via SQLAlchemy + pyodbc
 - **Charts:** Plotly (interactieve grafieken, server-side gerenderd als HTML)
 - **Rapporten:** PDF-export vanuit de Table Tree pagina
-- **Run-omgeving:** IIS (Windows), security via IIS user-identificatie
+- **Run-omgeving:** IIS (Windows), authenticatie via Flask sessie + gehashte wachtwoorden
 - **Frontend:** Jinja2 templates, Bootstrap 5
 
 ## 5. Architectuur
@@ -131,6 +131,8 @@ flask --app app run --debug
 - [Diagrams pagina](docs/diagrams_page.md) – opbouw, spinner, selectieboxen, dataflow
 - [Table Tree pagina](docs/table_tree_page.md) – flow, boomstructuur, JavaScript, validatie
 - [Projectverloop](docs/project_verloop.md) – tijdlijn, Gantt chart, bereikte doelen per fase
+- [Security](SECURITY.md) – authenticatie, autorisatie, CSRF, wachtwoordhashing, logging
+- [Auth setup](docs/auth_setup.md) – branch uitrollen, gebruikers aanmaken, omgevingsvariabelen
 
 ## Structure
 ![Project Structure](docs/ProjectStructureDiagram.png)
