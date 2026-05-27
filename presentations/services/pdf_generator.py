@@ -1,4 +1,3 @@
-# ... existing code ...
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,13 +8,54 @@ from data.model.models import InterlockNode
 
 
 class PdfGenerator:
+    """
+    Generate PDF exports for the Interlock Table Tree.
+
+    This class is intentionally stateless and free of Flask context so it
+    can be called from any route or background job without side effects.
+    Callers (routes) are responsible for handling validation errors and
+    flashing user messages before invoking this generator.
+    """
+
     @staticmethod
     def generate_interlock(items: List[InterlockNode]) -> BytesIO:
         """
-        Build a PDF in-memory and return a BytesIO positioned at 0 (ready for Flask send_file()).
+        Build an Interlock Tree export as an in-memory landscape A4 PDF.
 
-        This function intentionally does NOT depend on Flask request context (flash/redirect).
-        Callers (routes) should handle errors and user messaging.
+        The tree is flattened recursively into a tabular layout with
+        visual indentation (non-breaking spaces) to preserve the
+        parent-child hierarchy on paper.  Each row contains:
+
+        - **Interlock Message** — tree-indented label with level and message.
+        - **BSID** — the interlock block sequence ID.
+        - **PLC** — the PLC this interlock belongs to.
+        - **Direction** — e.g. ``"IN"`` / ``"OUT"``.
+        - **Timestamp** — when the fault was recorded.
+        - **Status** — current interlock status.
+        - **Conditions** — all bit conditions grouped per node, formatted
+          as ``[Bit N] message`` lines.
+
+        Column widths are tuned for landscape A4 with 24 pt margins so
+        nothing is cut off on standard printers.
+
+        Parameters
+        ----------
+        items:
+            The list of root :class:`~data.model.models.InterlockNode`
+            objects returned by
+            :meth:`~business.services.analyzer.InterlockService.analyze_interlock`.
+            May be empty, in which case a single "No data" row is written.
+
+        Returns
+        -------
+        io.BytesIO
+            An in-memory buffer positioned at byte 0, ready to be passed
+            directly to :func:`flask.send_file`.
+
+        Raises
+        ------
+        RuntimeError
+            If ``reportlab`` is not installed.
         """
         try:
             from reportlab.lib.pagesizes import A4, landscape
@@ -27,16 +67,33 @@ class PdfGenerator:
                 "PDF export requires the 'reportlab' dependency, but it is not available."
             ) from e
 
-        # Flatten the tree into rows, keeping the same "table tree" grouping via indentation
         def flatten(nodes: List[InterlockNode], depth: int = 0) -> List[list]:
+            """
+            Recursively flatten the interlock tree into a list of table rows.
+
+            Each level of depth adds 6 non-breaking spaces of indentation to
+            the first column so the hierarchy remains visible in the PDF.
+
+            Parameters
+            ----------
+            nodes:
+                The list of :class:`~data.model.models.InterlockNode` objects
+                at the current depth level.
+            depth:
+                Current recursion depth (0 = root).
+
+            Returns
+            -------
+            list[list]
+                A flat list of 7-element rows ready for a ReportLab ``Table``.
+            """
             rows: List[list] = []
             for n in nodes or []:
-                indent = "&nbsp;" * (depth * 6)  # visual tree indent that works in ReportLab Paragraph
+                indent = "&nbsp;" * (depth * 6)
                 caret = "▶ " if (getattr(n, "children", None) or []) else "• "
                 level = getattr(n, "level", "") or ""
                 msg = getattr(n, "interlock_message", "") or "N/A"
 
-                # Conditions: keep them grouped per node (like UI), but in one cell to fit paper
                 conds = getattr(n, "conditions", None) or []
                 if conds:
                     cond_text = "<br/>".join(
@@ -64,7 +121,6 @@ class PdfGenerator:
 
         buf = BytesIO()
 
-        # Margins: keep real printable margins so nothing gets cut off
         doc = SimpleDocTemplate(
             buf,
             pagesize=landscape(A4),
@@ -77,7 +133,6 @@ class PdfGenerator:
 
         styles = getSampleStyleSheet()
 
-        # Smaller fonts so everything fits nicely on paper
         title_style = ParagraphStyle(
             "ExportTitle",
             parent=styles["Title"],

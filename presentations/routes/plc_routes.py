@@ -17,14 +17,44 @@ from presentations.services.pdf_generator import PdfGenerator
 from presentations.services.diagram_pdf_service import DiagramPdfService
 
 bp = Blueprint("plc", __name__, url_prefix="/plc")
+
+# Module-level singletons — initialised once at import time so each request
+# reuses the same service instance without rebuilding internal state.
 service_interlock = InterlockService()
 _diagram_service = DiagramService()
 _diagram_pdf_service = DiagramPdfService()
 _fault_count_service = FaultCountService()
 
 
-def _parse_iso_datetime(value: str | None, field_name: str) -> dt.datetime | None:
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
 
+def _parse_iso_datetime(value: str | None, field_name: str) -> dt.datetime | None:
+    """
+    Parse an ISO 8601 datetime string into a :class:`datetime.datetime`.
+
+    Accepts any format supported by :meth:`datetime.fromisoformat`, e.g.
+    ``"2024-05-13T08:30"`` or ``"2024-05-13"``.
+
+    Parameters
+    ----------
+    value:
+        The raw string from the request.  ``None`` or an empty string
+        returns ``None`` without raising.
+    field_name:
+        Human-readable name used in the error message, e.g.
+        ``"filter_timestamp_start"``.
+
+    Returns
+    -------
+    datetime.datetime or None
+
+    Raises
+    ------
+    ValueError
+        If ``value`` is non-empty but cannot be parsed as ISO 8601.
+    """
     if value is None:
         return None
     value = value.strip()
@@ -38,6 +68,27 @@ def _parse_iso_datetime(value: str | None, field_name: str) -> dt.datetime | Non
 
 
 def _parse_optional_int(value: str, *, field_label: str, error_message: str) -> int | None:
+    """
+    Parse an optional integer from a form string value.
+
+    An empty or whitespace-only string is treated as "not provided" and
+    returns ``None``.  If the value is present but not a valid integer,
+    a flash error is added and ``None`` is returned so the caller can
+    continue rendering the page with a user-visible message.
+
+    Parameters
+    ----------
+    value:
+        Raw string from ``request.form``.
+    field_label:
+        Name used internally for identification (not shown to the user).
+    error_message:
+        The flash message shown to the user when the value is invalid.
+
+    Returns
+    -------
+    int or None
+    """
     value = value.strip()
     if not value:
         return None
@@ -49,7 +100,19 @@ def _parse_optional_int(value: str, *, field_label: str, error_message: str) -> 
 
 
 def _read_table_tree_form_params() -> dict:
-    """Read and normalize table-tree form fields from request.form."""
+    """
+    Extract and normalise all Table Tree filter fields from ``request.form``.
+
+    Returns a flat dict with the raw string values so that downstream
+    helpers can validate and convert them independently.
+
+    Returns
+    -------
+    dict
+        Keys: ``target_bsid_str``, ``top_n_str``,
+        ``filter_timestamp_start_raw``, ``filter_timestamp_end_raw``,
+        ``filter_condition_message``, ``filter_plc``.
+    """
     return {
         "target_bsid_str": request.form.get("target_bsid", ""),
         "top_n_str": request.form.get("top_n", ""),
@@ -62,9 +125,31 @@ def _read_table_tree_form_params() -> dict:
 
 def _parse_table_tree_filters_or_redirect(*, redirect_endpoint: str):
     """
-    Parse table-tree inputs from request.form.
-    Returns (analyze_kwargs, params_for_redirect) on success.
-    Returns a Flask redirect response on validation error.
+    Parse and validate Table Tree filters from the current POST request.
+
+    Reads form fields, validates integer and datetime inputs, and returns
+    two dicts on success:
+
+    - ``analyze_kwargs`` — ready to be unpacked into
+      :meth:`InterlockService.analyze_interlock`.
+    - ``params`` — a subset of the same values encoded as URL query
+      parameters for the POST → Redirect → GET pattern.
+
+    On validation failure a flash error is added and a Flask redirect
+    response is returned directly so the caller can ``return`` it
+    immediately.
+
+    Parameters
+    ----------
+    redirect_endpoint:
+        The Flask endpoint name (e.g. ``"plc.table_tree"``) to redirect
+        to on validation error.
+
+    Returns
+    -------
+    tuple[dict, dict] | flask.Response
+        A ``(analyze_kwargs, params)`` tuple on success, or a redirect
+        response on failure.
     """
     form = _read_table_tree_form_params()
 
@@ -111,8 +196,21 @@ def _parse_table_tree_filters_or_redirect(*, redirect_endpoint: str):
     return analyze_kwargs, params
 
 
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
 @bp.route("/")
 def home():
+    """
+    Render the landing page with a quick summary of last week's faults.
+
+    Calculates the Monday of the previous week as the ``reference_date``
+    and passes two pre-rendered Plotly HTML charts to the template:
+
+    - **Top risers** — faults that increased most compared to the baseline.
+    - **PLC pie** — fault distribution across all PLCs.
+    """
     today = dt.date.today()
     selected_date = today - dt.timedelta(days=today.weekday() + 7)
     top_risers_html = _diagram_service.grouped_bar_chart_2_html(reference_date=selected_date)
@@ -127,25 +225,51 @@ def home():
 
 @bp.route("/table")
 def table():
+    """Render the basic table page (no data loaded on initial visit)."""
     return render_template("table.html", title="Table", data=None)
 
 
 @bp.route("/about")
 def about():
+    """Render the static About page."""
     return render_template("about.html", title="About")
 
 
 @bp.route("/contact")
 def contact():
+    """Render the static Contact page."""
     return render_template("contact.html", title="Contact")
 
 
 def _first_monday_of_month_week(year: int, month: int, week: int) -> dt.date:
-    """Return the Monday of the *week*-th week in the given month.
+    """
+    Return the Monday that starts the *n*-th week of a given month.
 
-    Week 1 contains the first Monday that falls in (or starts) the month.
-    If the requested week overshoots the month, the last valid Monday is
-    returned instead.
+    Week numbering starts at 1 and counts from the first Monday that
+    falls in (or after) the 1st of the month.  If ``week`` points past
+    the last Monday in the month, the last valid Monday is returned
+    instead (clamping behaviour).
+
+    Parameters
+    ----------
+    year:
+        The calendar year, e.g. ``2024``.
+    month:
+        The calendar month (1–12).
+    week:
+        The 1-based week index within the month.
+
+    Returns
+    -------
+    datetime.date
+        The Monday for the requested week.
+
+    Examples
+    --------
+    >>> _first_monday_of_month_week(2024, 5, 1)
+    datetime.date(2024, 5, 6)   # first Monday of May 2024
+    >>> _first_monday_of_month_week(2024, 5, 2)
+    datetime.date(2024, 5, 13)
     """
     # Find the first Monday on or after the 1st of the month
     first_day = dt.date(year, month, 1)
@@ -161,10 +285,32 @@ def _first_monday_of_month_week(year: int, month: int, week: int) -> dt.date:
 
 @bp.route("/diagrams")
 def diagrams():
+    """
+    Render the full fault-analysis dashboard.
+
+    Accepts the following optional query parameters:
+
+    - ``month`` (int, 1–12) — defaults to the current month.
+    - ``week`` (int, 1–5) — week within the month; defaults to 1.
+    - ``plc`` (str) — if provided, also renders a fault heatmap for that PLC.
+
+    The ``reference_date`` is computed as the Monday that starts the
+    selected month/week.  All charts use snapshot data for that date,
+    with a live-query fallback if no snapshot exists yet.
+
+    Charts rendered:
+
+    - Faults per hour (bar)
+    - Top risers (horizontal bar, % increase)
+    - Faults per PLC (pie)
+    - MTBF per PLC (horizontal bar)
+    - Top 10 climbing faults over 52 weeks (line)
+    - Repeat offenders (horizontal bar)
+    - Per-PLC heatmap (only when ``plc`` is provided)
+    """
     selected_plc = request.args.get("plc", "").strip() or None
     plc_names    = _fault_count_service.get_all_plc_names()
 
-    # --- month / week selection ---
     now = dt.date.today()
     selected_month = request.args.get("month", type=int, default=now.month)
     selected_week  = request.args.get("week",  type=int, default=1)
@@ -172,7 +318,6 @@ def diagrams():
 
     selected_date = _first_monday_of_month_week(selected_year, selected_month, selected_week)
 
-    # Build month options list
     months = [(m, dt.date(selected_year, m, 1).strftime("%B")) for m in range(1, 13)]
 
     chart_html      = _diagram_service.grouped_bar_chart_html(reference_date=selected_date)
@@ -204,6 +349,21 @@ def diagrams():
 
 @bp.route("/diagrams-pdf")
 def diagrams_pdf():
+    """
+    Export all dashboard charts as a multi-page landscape PDF.
+
+    Accepts the same ``month`` and ``week`` query parameters as
+    :func:`diagrams`.  Delegates rendering to
+    :class:`~presentations.services.diagram_pdf_service.DiagramPdfService`,
+    which converts each Plotly figure to a PNG via Kaleido and assembles
+    them into a ReportLab PDF (2 charts per page).
+
+    Returns
+    -------
+    flask.Response
+        A ``application/pdf`` attachment named
+        ``diagrams_<reference_date>.pdf``.
+    """
     now = dt.date.today()
     selected_month = request.args.get("month", type=int, default=now.month)
     selected_week = request.args.get("week", type=int, default=1)
@@ -220,6 +380,20 @@ def diagrams_pdf():
 
 @bp.route("/pdf-table_tree_export-tree", methods=["POST"])
 def table_tree_export():
+    """
+    Export the current Interlock Table Tree result as a PDF.
+
+    Reads the same filter form fields as :func:`table_tree` (POST body).
+    On validation failure, redirects back to ``table_tree`` with a flash
+    error.  On success, calls :class:`~presentations.services.pdf_generator.PdfGenerator`
+    to build the PDF in memory and streams it as an attachment.
+
+    Returns
+    -------
+    flask.Response
+        A ``application/pdf`` attachment named ``table_tree_export.pdf``,
+        or a redirect on validation error.
+    """
     parsed = _parse_table_tree_filters_or_redirect(redirect_endpoint="plc.table_tree")
     if not isinstance(parsed, tuple):
         return parsed  # redirect response
@@ -238,6 +412,38 @@ def table_tree_export():
 
 @bp.route("/table-tree", methods=["GET", "POST"])
 def table_tree():
+    """
+    Render the Interlock Table Tree page with optional filtering.
+
+    **POST (form submit):**
+    Validates the filter inputs.  On success, redirects to the GET version
+    of this route with all filters encoded as query parameters
+    (POST → Redirect → GET pattern to prevent duplicate submissions on
+    browser refresh).  On validation error, flashes a message and redirects
+    back with whatever valid params were already collected.
+
+    **GET:**
+    Reads filter values from the query string.  If no filters are provided,
+    renders the page with an empty result set so the user sees the form
+    without a loading delay.  When filters are present, calls
+    :meth:`InterlockService.analyze_interlock` and passes the result tree
+    to ``table_tree.html``.
+
+    Query / form parameters
+    -----------------------
+    target_bsid : int, optional
+        Filter results to a specific interlock BSID.
+    top_n : int, optional
+        Limit output to the top N interlocks by fault count.
+    filter_timestamp_start : str, optional
+        ISO 8601 datetime lower bound, e.g. ``"2024-05-01T00:00"``.
+    filter_timestamp_end : str, optional
+        ISO 8601 datetime upper bound.
+    filter_condition_message : str, optional
+        Substring filter on the condition message text.
+    filter_plc : str, optional
+        Filter results to a specific PLC name.
+    """
     if request.method == "POST":
         parsed = _parse_table_tree_filters_or_redirect(redirect_endpoint="plc.table_tree")
         if not isinstance(parsed, tuple):

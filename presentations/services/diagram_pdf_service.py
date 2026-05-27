@@ -11,6 +11,21 @@ from data.repositories.snapshot_repository import SnapshotRepository
 
 
 class DiagramPdfService:
+    """
+    Build a multi-page landscape PDF containing all fault-analysis charts.
+
+    This service mirrors the chart logic of
+    :class:`~presentations.services.diagram_service_view.DiagramService` but
+    produces :class:`plotly.graph_objects.Figure` objects instead of HTML
+    strings.  Each figure is rasterised to a PNG via Kaleido
+    (``fig.to_image``), and the PNGs are assembled into a ReportLab PDF
+    (2 charts per A4 landscape page).
+
+    The separation from ``DiagramService`` is intentional: the web UI needs
+    lightweight HTML ``<div>`` strings, while PDF export needs pixel-perfect
+    PNG renders that require the full ``go.Figure`` object.
+    """
+
     _repo = SnapshotRepository()
     _fc_service = FaultCountService()
 
@@ -19,6 +34,19 @@ class DiagramPdfService:
     # ------------------------------------------------------------------
 
     def _faults_per_hour_fig(self, reference_date: date | None = None) -> go.Figure:
+        """
+        Build a bar chart figure of fault counts per hour of day.
+
+        Parameters
+        ----------
+        reference_date:
+            The Monday of the week to display.  Falls back to the latest
+            snapshot, then to yesterday's live data.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+        """
         snapshot_date, rows = self._repo.get_latest_hour_snapshot(reference_date=reference_date)
         if rows:
             hours = [f"{h:02d}h" for h, _ in rows]
@@ -39,6 +67,19 @@ class DiagramPdfService:
         return fig
 
     def _faults_per_plc_fig(self, reference_date: date | None = None) -> go.Figure:
+        """
+        Build a pie chart figure of fault counts per PLC.
+
+        Parameters
+        ----------
+        reference_date:
+            The Monday of the week to display.  Falls back to the latest
+            snapshot, then to yesterday's live data.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+        """
         snapshot_date, rows = self._repo.get_latest_plc_snapshot(reference_date=reference_date)
         if rows:
             labels = [plc for plc, _ in rows]
@@ -57,6 +98,19 @@ class DiagramPdfService:
         return fig
 
     def _top_risers_fig(self, reference_date: date | None = None) -> go.Figure:
+        """
+        Build a horizontal bar chart figure of the top fault risers.
+
+        Parameters
+        ----------
+        reference_date:
+            The Monday of the week to display.  Falls back to the latest
+            snapshot, then to live data.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+        """
         snapshot_date, rows = self._repo.get_latest_top_risers(reference_date=reference_date)
         if rows:
             labels = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
@@ -78,6 +132,19 @@ class DiagramPdfService:
         return fig
 
     def _mtbf_fig(self, reference_date: date | None = None) -> go.Figure:
+        """
+        Build a horizontal bar chart figure of MTBF per PLC.
+
+        Parameters
+        ----------
+        reference_date:
+            The Monday of the week to display.  Falls back to the latest
+            snapshot, then to live data.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+        """
         snapshot_date, rows = self._repo.get_latest_mtbf(reference_date=reference_date)
         if rows:
             plcs = [r[0] for r in rows]
@@ -87,7 +154,7 @@ class DiagramPdfService:
             live = self._fc_service.get_mtbf_per_plc()
             plcs = [r.plc_name for r in live]
             avg_hours = [r.avg_hours for r in live]
-            title = f"MTBF per PLC (live)"
+            title = "MTBF per PLC (live)"
 
         fig = go.Figure()
         fig.add_trace(go.Bar(x=avg_hours, y=plcs, orientation='h',
@@ -99,6 +166,19 @@ class DiagramPdfService:
         return fig
 
     def _repeat_offenders_fig(self, reference_date: date | None = None) -> go.Figure:
+        """
+        Build a horizontal bar chart figure of the top repeat-offender faults.
+
+        Parameters
+        ----------
+        reference_date:
+            The Monday of the week to display.  Falls back to the latest
+            snapshot, then to live data.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure
+        """
         snapshot_date, rows = self._repo.get_latest_repeat_offenders(reference_date=reference_date)
         if rows:
             labels = [f"{m} ({p})" for m, p, _ in rows]
@@ -120,6 +200,14 @@ class DiagramPdfService:
         return fig
 
     def _long_term_trend_fig(self) -> go.Figure | None:
+        """
+        Build a multi-line chart figure of the top climbing faults over 52 weeks.
+
+        Returns
+        -------
+        plotly.graph_objects.Figure or None
+            ``None`` when the daily snapshot job has not produced any data yet.
+        """
         climbers = self._repo.get_top_climbers(top_n=10)
         if not climbers:
             return None
@@ -143,7 +231,34 @@ class DiagramPdfService:
     # ------------------------------------------------------------------
 
     def generate_pdf(self, reference_date: date | None = None) -> BytesIO:
-        """Render all diagrams to a multi-page landscape PDF."""
+        """
+        Render all fault-analysis charts into a multi-page landscape PDF.
+
+        Steps:
+
+        1. Build each chart as a :class:`plotly.graph_objects.Figure`.
+        2. Rasterise every figure to a PNG at 2× scale via Kaleido
+           (``fig.to_image``).
+        3. Assemble the PNGs into a ReportLab ``SimpleDocTemplate``
+           (landscape A4, 2 charts per page).
+
+        Parameters
+        ----------
+        reference_date:
+            The Monday of the week whose data should appear in the PDF.
+            ``None`` uses the latest available snapshot for each chart.
+
+        Returns
+        -------
+        io.BytesIO
+            An in-memory buffer positioned at byte 0, ready to be passed
+            directly to :func:`flask.send_file`.
+
+        Raises
+        ------
+        RuntimeError
+            If ``reportlab`` is not installed.
+        """
         try:
             from reportlab.lib.pagesizes import A4, landscape
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

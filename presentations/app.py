@@ -14,6 +14,32 @@ _app_log = logging.getLogger("presentations")
 
 
 def create_app() -> Flask:
+    """
+    Flask application factory.
+
+    Creates and fully configures the Flask application instance:
+
+    - Calls :func:`setup_logging` to initialise file and console logging.
+    - Loads ``config/config.toml`` for server host/port settings.  If the
+      file is missing or contains invalid TOML, defaults are used and an
+      error is logged — the app still starts.
+    - Registers the ``plc`` blueprint (all ``/plc/*`` routes).
+    - Attaches a ``before_request`` hook that seeds the Flask session with
+      the current user's credentials on every request.
+    - Registers error handlers for 404, 500, and unhandled exceptions that
+      render a consistent ``error.html`` page.
+
+    Returns
+    -------
+    Flask
+        A ready-to-serve Flask application.
+
+    Notes
+    -----
+    ``app.secret_key`` is currently hardcoded to ``"dev"``.  In production
+    this must be replaced with a strong random value set via an environment
+    variable.
+    """
     setup_logging()
 
     app = Flask("app")
@@ -39,6 +65,17 @@ def create_app() -> Flask:
 
     @app.before_request
     def ensure_session_credentials():
+        """
+        Populate the Flask session with the current user's credentials.
+
+        Runs before every request.  Calls :class:`CredentialService` to
+        resolve the active credential and writes ``session["username"]`` and
+        ``session["role"]``.  Logs a single info message the first time a
+        new session is created so that login events appear in ``auth.log``.
+
+        If ``CredentialService`` returns ``None`` (no authenticated user),
+        the session is left unchanged.
+        """
         cred = CredentialService.get_current_credential()
         if cred is not None:
             is_new_session = "username" not in session
@@ -50,6 +87,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(404)
     def not_found(e):
+        """Render the 404 error page when a route is not found."""
         return render_template(
             "error.html", title="Error",
             error_code=404,
@@ -59,6 +97,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(500)
     def internal_error(e):
+        """Render the 500 error page and log the exception."""
         app.logger.error("Internal server error: %s", e, exc_info=True)
         return render_template(
             "error.html", title="Error",
@@ -69,6 +108,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(Exception)
     def handle_exception(e):
+        """Catch-all handler for any unhandled exception — logs and renders a 500 page."""
         app.logger.error("Unhandled exception: %s", e, exc_info=True)
         return render_template(
             "error.html", title="Error",
@@ -79,10 +119,12 @@ def create_app() -> Flask:
 
     @app.route("/ping")
     def ping():
+        """Health-check endpoint. Returns ``"pong"`` with a 200 status."""
         return "pong"
 
     @app.route("/")
     def start():
-       return redirect(url_for("plc.home"))
+        """Redirect the root URL to the PLC home page."""
+        return redirect(url_for("plc.home"))
 
     return app
