@@ -122,8 +122,17 @@ Gedefinieerd in `base.html`, beschikbaar op alle pagina's:
 
 ## 10. Runnen
 
+  set_env.sh 
+  
+  export GOOGLE_CLIENT_ID="YOUR_REAL_ID.apps.googleusercontent.com"
+
+  export GOOGLE_CLIENT_SECRET="YOUR_REAL_SECRET"
+
+  export FLASK_SECRET_KEY="any-random-string-is-fine-for-dev"
+
+  Then in your terminal (not here), run:
 ```bash
-flask --app app run --debug
+source set_env.sh && uv run flask --app presentations.app:create_app run --debug --port 5001  
 ```
 
 ## 11. Documentatie
