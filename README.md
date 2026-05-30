@@ -140,6 +140,8 @@ source set_env.sh && uv run flask --app presentations.app:create_app run --debug
 - [Diagrams pagina](docs/diagrams_page.md) – opbouw, spinner, selectieboxen, dataflow
 - [Table Tree pagina](docs/table_tree_page.md) – flow, boomstructuur, JavaScript, validatie
 - [Projectverloop](docs/project_verloop.md) – tijdlijn, Gantt chart, bereikte doelen per fase
+- [Presentatie NL](docs/FirstFaults_Presentatie_NL.pptx) – projectpresentatie in het Nederlands
+- [Presentation EN](docs/FirstFaults_Presentation.pptx) – project presentation in English
 
 ## Structure
 ![Project Structure](docs/ProjectStructureDiagram.png)
