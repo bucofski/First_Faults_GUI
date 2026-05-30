@@ -167,3 +167,4 @@ cython_debug/
 /.venv
 config/Connection.yaml
 uv.lock
+/data/users.json
