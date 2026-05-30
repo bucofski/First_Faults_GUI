@@ -69,10 +69,17 @@ def run():
         """))
 
         tables = [
+            # snapshot/derived tables first (they reference the core tables)
             "FF_CONDITION_LOG",
             "FF_INTERLOCK_LOG",
             "FAULT_TREND_SNAPSHOTS",
             "TREND_ANALYSIS_CONFIG",
+            "long_term_trend_snapshot",
+            "repeat_offender_snapshot",
+            "top_riser_snapshot",
+            "daily_plc_snapshot",
+            "mtbf_snapshot",
+            # core definition tables in FK order
             "CONDITION_DEFINITION",
             "INTERLOCK_DEFINITION",
             "TEXT_DEFINITION",
