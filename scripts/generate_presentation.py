@@ -215,6 +215,171 @@ for line in [
 
 
 # ===========================================================================
+# Slide 3b — Basic Circuits (what & why)
+# ===========================================================================
+slide = slide_base("Basic Circuits", "Series enable-chains (vrijgaveketens) behind every drive")
+
+add_rect(slide, 0.35, 1.65, 6.0, 4.0, RGBColor(0x0D, 0x15, 0x26))
+add_rect(slide, 6.65, 1.65, 6.33, 4.0, RGBColor(0x0D, 0x15, 0x26))
+
+section_label(slide, "What is a basic circuit?", l=0.35, t=1.65)
+_, tf = bullet_box(slide, 0.55, 2.15, 5.7, 3.4)
+for line in [
+    "A basic circuit (basisschakeling) is a SERIES chain of conditions — AND logic",
+    "The drive is only enabled (Vrijgave) when EVERY condition in the chain is true",
+    "One broken link breaks the whole chain → the machine stops",
+    "Each link is itself a basic circuit, so chains nest many levels deep",
+]:
+    add_para(tf, f"›  {line}", font_size=14, color=LIGHT_GREY, space_before=10)
+
+section_label(slide, "Why it matters for First Faults", l=6.65, t=1.65)
+_, tf = bullet_box(slide, 6.85, 2.15, 6.0, 3.4)
+for line in [
+    "A single stop can hide behind dozens of nested conditions",
+    "Operators must find which link failed first — the 'first fault'",
+    "Tracing this by hand across PLCs is slow and error-prone",
+    "First Faults reconstructs the chain automatically and points to the root cause",
+]:
+    add_para(tf, f"›  {line}", font_size=14, color=LIGHT_GREY, space_before=10)
+
+# Drawn series-chain illustration along the bottom
+add_text(slide, "AND-logic in series — one failed link (red) stops the whole drive",
+         l=0.35, t=5.8, w=12.6, h=0.35, font_size=12, italic=True, color=MID_GREY)
+chain = [
+    ("No current reduction", GREEN_OK),
+    ("Position OK", GREEN_OK),
+    ("Drives released", ACCENT),   # first fault
+    ("No e-stop", GREEN_OK),
+]
+node_w, node_h, gap = 2.15, 0.6, 0.42
+x = 0.35
+y = 6.25
+for i, (label, col) in enumerate(chain):
+    add_rect(slide, x, y, node_w, node_h, col)
+    add_text(slide, label, l=x, t=y + 0.13, w=node_w, h=0.34,
+             font_size=10, bold=True,
+             color=DARK_BG if col != ACCENT else WHITE, align=PP_ALIGN.CENTER)
+    # connector to next node
+    add_rect(slide, x + node_w, y + node_h / 2 - 0.02, gap, 0.04, MID_GREY)
+    x += node_w + gap
+# final enable node
+add_rect(slide, x, y, node_w, node_h, RGBColor(0x14, 0x5A, 0x8A))
+add_text(slide, "VRIJGAVE", l=x, t=y + 0.13, w=node_w, h=0.34,
+         font_size=11, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+
+
+# ===========================================================================
+# Slide 3c — Operator overview / entry point (first fault on the big picture)
+# ===========================================================================
+slide = slide_base("How the Operator Sees It",
+                   "The overview screen flags the first fault")
+
+ov_img  = os.path.join(DOCS_DIR, "bs_operator_overview.png")
+det_img = os.path.join(DOCS_DIR, "bs_drill_1_tandem.png")
+
+if os.path.exists(ov_img):
+    # overview matrix — aspect 993/899
+    slide.shapes.add_picture(ov_img, Inches(0.35), Inches(1.7),
+                             width=Inches(4.6), height=Inches(4.6 / (993 / 899)))
+if os.path.exists(det_img):
+    # first diagnostic window the operator opens — aspect 1323/814
+    slide.shapes.add_picture(det_img, Inches(5.25), Inches(1.7),
+                             width=Inches(7.55), height=Inches(7.55 / (1323 / 814)))
+
+add_text(slide, "Overview — status per drive (WT1–WT5); the red marker flags the first fault",
+         l=0.35, t=5.9, w=4.7, h=0.6, font_size=11, italic=True, color=LIGHT_GREY)
+add_text(slide, "Clicking the fault opens its diagnostic window — the start of the chain",
+         l=5.25, t=6.45, w=7.55, h=0.4, font_size=11, italic=True, color=LIGHT_GREY)
+
+# Callout band
+add_rect(slide, 0.35, 6.95, 4.7, 0.45, RGBColor(0x0D, 0x15, 0x26))
+add_text(slide, "From the big picture, the operator drills into the first fault →",
+         l=0.45, t=6.99, w=4.6, h=0.4, font_size=10, color=ACCENT)
+
+
+# ===========================================================================
+# Slide 3d — Following the fault chain (cascade drill-down)
+# ===========================================================================
+slide = slide_base("Following the Fault Chain",
+                   "Drill down red bar → red bar, until the very first fault")
+
+# Cascade of diagnostic windows — each red condition opens the next window.
+# (file, aspect w/h, step title, BS number)
+drill = [
+    ("bs_drill_1_tandem.png",     1323 / 814, "Tandem stop request",  "BS 1208"),
+    ("bs_drill_2_algemeen.png",   1328 / 823, "General interlocks",   "BS 1206"),
+    ("bs_drill_3_trekopbouw.png",  971 / 619, "Enable Trek-opbouw",   "BS 11221"),
+    ("bs_drill_4_wt3.png",         972 / 619, "Drive WT3",            "BS 21214"),
+    ("bs_drill_5_lijndata.png",    969 / 615, "Line data (Lijndata)", "BS 20106"),
+]
+
+img_w  = 4.4
+x0, y0 = 0.4, 1.45
+dx, dy = 1.2, 0.72
+for i, (fname, aspect, _t, _bs) in enumerate(drill):
+    img = os.path.join(DOCS_DIR, fname)
+    x = x0 + i * dx
+    y = y0 + i * dy
+    if os.path.exists(img):
+        slide.shapes.add_picture(img, Inches(x), Inches(y),
+                                 width=Inches(img_w), height=Inches(img_w / aspect))
+    # step badge at the top-left corner of each window
+    add_rect(slide, x - 0.02, y - 0.02, 0.42, 0.42, ACCENT)
+    add_text(slide, str(i + 1), l=x - 0.02, t=y + 0.02, w=0.42, h=0.36,
+             font_size=16, bold=True, color=DARK_BG, align=PP_ALIGN.CENTER)
+
+# Right-side legend: the drill path, step by step
+add_rect(slide, 10.1, 1.5, 2.9, 5.4, RGBColor(0x0D, 0x15, 0x26))
+add_text(slide, "Drill path", l=10.25, t=1.6, w=2.6, h=0.4,
+         font_size=15, bold=True, color=ACCENT)
+ly = 2.05
+for i, (_f, _a, title, bs) in enumerate(drill):
+    add_rect(slide, 10.25, ly, 0.4, 0.4, ACCENT)
+    add_text(slide, str(i + 1), l=10.25, t=ly + 0.02, w=0.4, h=0.34,
+             font_size=13, bold=True, color=DARK_BG, align=PP_ALIGN.CENTER)
+    add_text(slide, title, l=10.78, t=ly - 0.04, w=2.2, h=0.34,
+             font_size=11, bold=True, color=WHITE)
+    add_text(slide, bs, l=10.78, t=ly + 0.26, w=2.2, h=0.3,
+             font_size=10, italic=True, color=LIGHT_GREY)
+    if i < len(drill) - 1:
+        add_text(slide, "↓", l=10.32, t=ly + 0.5, w=0.4, h=0.3,
+                 font_size=13, bold=True, color=ACCENT)
+    ly += 0.93
+
+# Caption
+add_text(slide, "Each red bar opens its own sub-circuit — the operator follows the red "
+                "thread down to the root fault.",
+         l=0.4, t=7.05, w=9.4, h=0.4, font_size=11, italic=True, color=LIGHT_GREY)
+
+
+# ===========================================================================
+# Slide 3d — How the programmer sees it
+# ===========================================================================
+slide = slide_base("How the Programmer Sees It",
+                   "The same chain as PLC function-block logic")
+
+prog_img = os.path.join(DOCS_DIR, "bs_programmer_logic.png")
+if os.path.exists(prog_img):
+    slide.shapes.add_picture(prog_img, Inches(0.35), Inches(1.7),
+                             width=Inches(9.45), height=Inches(5.05))
+    add_text(slide, "PLC programming environment — PilootTD rijtoestanden-logica",
+             l=0.35, t=6.78, w=9.45, h=0.35, font_size=11, italic=True, color=LIGHT_GREY)
+
+add_rect(slide, 9.95, 1.7, 3.03, 5.05, RGBColor(0x0D, 0x15, 0x26))
+add_text(slide, "From bars to blocks", l=10.1, t=1.8, w=2.8, h=0.4,
+         font_size=15, bold=True, color=ACCENT)
+_, tf = bullet_box(slide, 10.1, 2.35, 2.8, 4.3)
+for line in [
+    "Same enable-chain, now as function-block logic",
+    "Each BS1 / BS_VW block = one basic circuit",
+    "PermVw in → Vrijgave out, daisy-chained left → right",
+    "The green/red bars the operator sees are these block states",
+    "First Faults reads this structure straight from the PLC database",
+]:
+    add_para(tf, f"·  {line}", font_size=12, color=LIGHT_GREY, space_before=10)
+
+
+# ===========================================================================
 # Slide 4 — Goals & Success Criteria
 # ===========================================================================
 slide = slide_base("Goals & Success Criteria", "What does 'done' look like?")
