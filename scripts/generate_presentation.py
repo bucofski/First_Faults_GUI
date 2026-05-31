@@ -8,6 +8,7 @@ from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
+from PIL import Image
 import os
 
 # ---------------------------------------------------------------------------
@@ -26,6 +27,8 @@ SLIDE_H = Inches(7.5)
 
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS_DIR    = os.path.join(BASE_DIR, "docs")
+LOGO_PATH   = os.path.join(DOCS_DIR, "AML.png")
+LOGO_ASPECT = 110 / 57   # ArcelorMittal logo native pixel ratio (w / h)
 OUTPUT_PATH = os.path.join(BASE_DIR, "presentations", "FirstFaults_Presentation.pptx")
 
 os.makedirs(os.path.join(BASE_DIR, "presentations"), exist_ok=True)
@@ -80,6 +83,30 @@ def add_para(tf, text, font_size=16, bold=False, color=WHITE,
     return p
 
 
+def content_box(path):
+    """Fractional (left, top, right, bottom) of the opaque/visible content
+    within an image, ignoring transparent margins added by cropping.
+    Falls back to the full frame for images without alpha."""
+    im = Image.open(path)
+    w, h = im.width, im.height
+    bbox = None
+    if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+        alpha = im.convert("RGBA").getchannel("A")
+        bbox = alpha.point(lambda a: 255 if a > 10 else 0).getbbox()
+    if bbox is None:
+        bbox = (0, 0, w, h)
+    l, t, r, b = bbox
+    return l / w, t / h, r / w, b / h
+
+
+def add_logo(slide, height, l, t):
+    """Place the ArcelorMittal logo at (l, t) with the given height (inches)."""
+    if os.path.exists(LOGO_PATH):
+        slide.shapes.add_picture(LOGO_PATH, Inches(l), Inches(t),
+                                 height=Inches(height),
+                                 width=Inches(height * LOGO_ASPECT))
+
+
 def slide_base(title_text, subtitle_text=""):
     """Dark background slide with header bar."""
     slide = prs.slides.add_slide(BLANK)
@@ -94,6 +121,10 @@ def slide_base(title_text, subtitle_text=""):
     add_text(slide, title_text,
              l=0.35, t=0.08, w=10.5, h=0.85,
              font_size=28, bold=True, color=WHITE)
+
+    # logo in the top-right of the header bar
+    logo_h = 0.55
+    add_logo(slide, logo_h, l=13.33 - logo_h * LOGO_ASPECT - 0.3, t=(1.0 - logo_h) / 2)
 
     # slide number indicator (small, top-right)
     # subtitle below bar
@@ -130,6 +161,11 @@ add_rect(slide, 0, 0, 13.33, 7.5, DARK_BG)
 add_rect(slide, 0, 0, 13.33, 0.08, ACCENT)          # thin top line
 add_rect(slide, 0, 7.42, 13.33, 0.08, ACCENT)       # thin bottom line
 add_rect(slide, 0, 2.8, 13.33, 2.35, RGBColor(0x0D, 0x15, 0x26))  # dark band
+
+# ArcelorMittal logo, centred at the bottom of the dark band
+cover_logo_h = 0.9
+add_logo(slide, cover_logo_h,
+         l=(13.33 - cover_logo_h * LOGO_ASPECT) / 2, t=5.55)
 
 add_text(slide, "FIRST FAULTS GUI",
          l=0.5, t=0.6, w=12.3, h=1.0,
@@ -212,6 +248,55 @@ for line in [
     "Sub-second queries via optimised SQL Server TVFs and indexes",
 ]:
     add_para(tf, f"›  {line}", font_size=14, color=LIGHT_GREY, space_before=8)
+
+
+# ===========================================================================
+# Slide 3a — Reason Why (motivation)
+# ===========================================================================
+slide = slide_base("Why This Project?", "The reasons that triggered First Faults")
+
+# Six reason cards in a 2-column × 3-row grid.
+reasons = [
+    ("Database hit its ceiling",
+     "The existing database wasn't performant enough — asking for larger "
+     "time ranges of data was slow or returned nothing at all."),
+    ("No tool for technicians",
+     "Maintenance engineers had no dedicated application — only the raw, "
+     "real-time CIMPLICITY alarms with no history."),
+    ("Fault finding was hard",
+     "Tracing a stop back to its first fault through nested interlock "
+     "chains was manual, slow and error-prone."),
+    ("No line-fault analysis",
+     "There was no way to analyse line faults over time — no trends, "
+     "no top-risers, no week-over-week comparison."),
+    ("No historical reporting",
+     "Nothing supported shift handover or documentation — no PDF exports "
+     "or stored snapshots to look back on."),
+    ("Reactive, not proactive",
+     "Without trend visibility, maintenance stayed reactive — climbing "
+     "faults went unnoticed until they caused a breakdown."),
+]
+
+col_x  = [0.35, 6.75]
+col_w  = [6.0, 6.23]
+row_y  = [1.7, 3.43, 5.16]
+card_h = 1.55
+for idx, (title, desc) in enumerate(reasons):
+    c = idx % 2
+    r = idx // 2
+    x = col_x[c]
+    y = row_y[r]
+    w = col_w[c]
+    add_rect(slide, x, y, w, card_h, RGBColor(0x0D, 0x15, 0x26))
+    add_rect(slide, x, y, 0.12, card_h, ACCENT)          # accent spine
+    # number chip
+    add_rect(slide, x + 0.28, y + 0.22, 0.5, 0.5, ACCENT)
+    add_text(slide, str(idx + 1), l=x + 0.28, t=y + 0.26, w=0.5, h=0.44,
+             font_size=18, bold=True, color=DARK_BG, align=PP_ALIGN.CENTER)
+    add_text(slide, title, l=x + 0.95, t=y + 0.18, w=w - 1.1, h=0.45,
+             font_size=15, bold=True, color=WHITE)
+    add_text(slide, desc, l=x + 0.95, t=y + 0.62, w=w - 1.15, h=0.85,
+             font_size=11, color=LIGHT_GREY)
 
 
 # ===========================================================================
@@ -320,12 +405,19 @@ for i, (fname, aspect, _t, _bs) in enumerate(drill):
     img = os.path.join(DOCS_DIR, fname)
     x = x0 + i * dx
     y = y0 + i * dy
+    img_h = img_w / aspect
+    # default badge anchor = image frame corner; refined to the real window
+    # corner so it stays put even when the PNG has transparent crop margins
+    bx, by = x, y
     if os.path.exists(img):
         slide.shapes.add_picture(img, Inches(x), Inches(y),
-                                 width=Inches(img_w), height=Inches(img_w / aspect))
+                                 width=Inches(img_w), height=Inches(img_h))
+        lf, tf, _r, _b = content_box(img)
+        bx = x + lf * img_w
+        by = y + tf * img_h
     # step badge at the top-left corner of each window
-    add_rect(slide, x - 0.02, y - 0.02, 0.42, 0.42, ACCENT)
-    add_text(slide, str(i + 1), l=x - 0.02, t=y + 0.02, w=0.42, h=0.36,
+    add_rect(slide, bx - 0.02, by - 0.02, 0.42, 0.42, ACCENT)
+    add_text(slide, str(i + 1), l=bx - 0.02, t=by + 0.02, w=0.42, h=0.36,
              font_size=16, bold=True, color=DARK_BG, align=PP_ALIGN.CENTER)
 
 # Right-side legend: the drill path, step by step
@@ -355,7 +447,7 @@ add_text(slide, "Each red bar opens its own sub-circuit — the operator follows
 # ===========================================================================
 # Slide 3d — How the programmer sees it
 # ===========================================================================
-slide = slide_base("How the Programmer Sees It",
+slide = slide_base("How the PLC Programmer Sees It",
                    "The same chain as PLC function-block logic")
 
 prog_img = os.path.join(DOCS_DIR, "bs_programmer_logic.png")
@@ -393,7 +485,7 @@ goals = [
     (GREEN_OK,   "DONE",  "Weekly fault snapshots + historical reference-date picker"),
     (GREEN_OK,   "DONE",  "Query performance: from ~8 s to < 1 s"),
     (YELLOW_WIP, "WIP",   "Scheduled daily snapshot runs + automated weekly email report"),
-    (YELLOW_WIP, "WIP",   "Final IIS deployment + user acceptance test (target: 11 June 2026)"),
+    (YELLOW_WIP, "WIP",   "Final IIS deployment + user acceptance test (target: July 2026)"),
     (YELLOW_WIP, "LATER", "Role-based access (read-only vs. admin configuration)"),
     (YELLOW_WIP, "LATER", "Configurable alert thresholds with Teams/email notification"),
 ]
