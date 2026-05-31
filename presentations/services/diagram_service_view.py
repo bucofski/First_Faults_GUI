@@ -11,6 +11,12 @@ class DiagramService:
     _repo = SnapshotRepository()
     _fc_service = FaultCountService()
 
+    @staticmethod
+    def _no_weekly_data_msg(name: str, per_week: bool = True) -> str:
+        """Message shown when a chart needs weekly snapshot data that isn't there yet."""
+        suffix = " for this week" if per_week else ""
+        return f"<p>Weekly run for {name} hasn't been run yet{suffix}.</p>"
+
     def grouped_bar_chart_html(self, reference_date: date | None = None):
         snapshot_date, rows = self._repo.get_latest_hour_snapshot(reference_date=reference_date)
         if rows:
@@ -99,21 +105,15 @@ class DiagramService:
 
         snapshot_date, rows = self._repo.get_latest_top_risers(recent_days, baseline_days, top_n, reference_date=reference_date)
 
-        if rows:
-            labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
-            delta_pcts = [r['delta_pct']                        for r in rows]
-            custom     = [[r['recent_count'], r['baseline_count']] for r in rows]
-            ref_label  = str(snapshot_date)
-        else:
-            live = self._fc_service.get_top_risers(
-                recent_days=recent_days, baseline_days=baseline_days, top_n=top_n,
-            )
-            if not live:
-                return "<p>No top risers data available yet.</p>"
-            labels     = [f"{r.mnemonic} ({r.plc_name})" for r in live]
-            delta_pcts = [r.delta_pct                    for r in live]
-            custom     = [[r.recent_count, r.baseline_count] for r in live]
-            ref_label  = "live"
+        # No snapshot for the selected week — show a message instead of falling
+        # back to a slow live computation (two large window scans).
+        if not rows:
+            return self._no_weekly_data_msg("top risers")
+
+        labels     = [f"{r['mnemonic']} ({r['plc_name']})" for r in rows]
+        delta_pcts = [r['delta_pct']                        for r in rows]
+        custom     = [[r['recent_count'], r['baseline_count']] for r in rows]
+        ref_label  = str(snapshot_date)
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -145,7 +145,7 @@ class DiagramService:
         snapshot_date, rows = self._repo.get_latest_repeat_offenders(days_window=days, top_n=top_n, reference_date=reference_date)
 
         if not rows:
-            return "<p>No repeat offender snapshot available for this week yet.</p>"
+            return self._no_weekly_data_msg("repeat offenders")
 
         labels = [f"{mnemonic} ({plc})" for mnemonic, plc, _ in rows]
         counts = [c for _, _, c in rows]
@@ -177,7 +177,7 @@ class DiagramService:
         climbers = self._repo.get_top_climbers(top_n=top_n)
 
         if not climbers:
-            return "<p>No trend data yet — run the daily snapshot job first.</p>"
+            return self._no_weekly_data_msg("long-term trend", per_week=False)
 
         fig = go.Figure()
         for entry in climbers:
@@ -212,7 +212,7 @@ class DiagramService:
         snapshot_date, rows = self._repo.get_latest_mtbf(days_window=days, reference_date=reference_date)
 
         if not rows:
-            return "<p>No MTBF snapshot available for this week yet.</p>"
+            return self._no_weekly_data_msg("MTBF")
 
         plcs         = [r[0] for r in rows]
         avg_hours    = [r[1] for r in rows]

@@ -52,7 +52,9 @@ def _fetch(start: date, end: date) -> list:
 def _past_mondays(weeks: int) -> list[date]:
     today = _today()
     last_monday = today - timedelta(days=today.weekday())
-    return [last_monday - timedelta(weeks=i) for i in range(1, weeks + 1)]
+    # range(0, weeks) includes the current week's Monday — that Monday has
+    # already passed and has data, so it must get a (partial) weekly snapshot.
+    return [last_monday - timedelta(weeks=i) for i in range(0, weeks)]
 
 
 def _clear_all_tables() -> None:
