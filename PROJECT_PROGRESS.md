@@ -83,7 +83,27 @@ all within the IIS security boundary already used on-site.
 
 ---
 
-## Current State (May 2026)
+### Phase 5 — Authentication: Google OAuth, TOTP, Corporate Login · Jun 2026
+
+| Date | Milestone |
+|------|-----------|
+| 2026-06-01 | Google OAuth 2.0 via `authlib`; partial-auth session state |
+| 2026-06-01 | TOTP 2FA: QR-code enrollment + 6-digit verification (`pyotp`, `qrcode`) |
+| 2026-06-01 | `user_store` (thread-safe JSON) for Google users + TOTP secrets |
+| 2026-06-02 | In-house `auth_server/oauth2_server.py` (Authorization Code grant) |
+| 2026-06-02 | Corporate login as a second, fully independent path — no internet, no TOTP |
+| 2026-06-02 | Per-provider Blueprint refactor (`auth_google.py`, `auth_corporate.py`); TOTP extracted to `totp_service.py` |
+| 2026-06-02 | 503 "OAuth Server Not Available" error page when the local auth server is down |
+| 2026-06-02 | `oauth2_server.py` HTML refactored to First Faults' Bootstrap 5.3.2 look |
+| 2026-06-02 | `datetime.utcnow()` → `datetime.now(UTC)` to remove deprecation warnings |
+| 2026-06-02 | `./run.sh` launcher; `set_env.sh` exports `FLASK_RUN_HOST=localhost`, `FLASK_RUN_PORT=5001` to match Google Console |
+
+**Outcome:** Login page offers two clearly separated paths (Google + Corporate).
+Adding a third OAuth provider is a single new blueprint file — no changes to existing code.
+
+---
+
+## Current State (June 2026)
 
 | Area | Status |
 |------|--------|
@@ -94,6 +114,8 @@ all within the IIS security boundary already used on-site.
 | PDF export — interlock tree | Working |
 | Long-term regression reports | Working |
 | Snapshot / backfill system | Working |
+| Authentication — Google OAuth + TOTP | Working |
+| Authentication — Corporate (local OAuth server) | Working |
 | MailService | Implemented, not yet wired to scheduled jobs |
 | ML fault prediction | Experimental — not in production |
 | IIS deployment | Pending final integration test |
@@ -112,6 +134,9 @@ all within the IIS security boundary already used on-site.
 - [x] Reference-date selection for historical snapshot comparison
 - [x] Sub-second reporting queries (index + query rewrite)
 - [x] Architecture and database documentation
+- [x] Google OAuth 2.0 login + TOTP 2FA enrollment/verification
+- [x] Corporate login via in-house OAuth2 server (independent from Google)
+- [x] Provider-agnostic login page; add a new provider with one blueprint file
 
 ### In Progress / Short-term (before MVP — 11 June 2026)
 - [ ] Schedule daily snapshot runs via Windows Task Scheduler / IIS
@@ -145,3 +170,5 @@ all within the IIS security boundary already used on-site.
 | ReportLab for PDF | Full control over layout; no external service needed |
 | Snapshots stored weekly | Balances storage cost vs. historical resolution for trend analysis |
 | IIS authentication | No custom login required; leverages existing site security infrastructure |
+| One Flask Blueprint per OAuth provider | Each provider's flow is fully self-contained — no shared OAuth code, no risk of one provider's bug affecting another; new providers added in isolation |
+| Corporate users live only in the local OAuth server | Keeps the app stateless w.r.t. corporate identity; password resets / user management stay where they belong (in the auth server, not in the app) |

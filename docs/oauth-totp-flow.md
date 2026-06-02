@@ -1,199 +1,306 @@
-# Authenticatie: Google OAuth 2.0 + TOTP (2FA)
+# Authentication — Google OAuth + Corporate OAuth + TOTP
 
-## Overzicht
+## Overview
 
-De applicatie gebruikt een **twee-staps authenticatie**:
+The application supports **two independent login paths**, both reachable from `/auth/login`:
 
-1. **Google OAuth 2.0** – de gebruiker logt in via zijn Google-account (SSO).
-2. **TOTP (Time-based One-Time Password)** – na Google wordt een 6-cijferige code gevraagd uit een authenticator-app (bijv. Google Authenticator of Authy).
+1. **Google OAuth 2.0** (over the internet) + **TOTP (2FA)** — Google identity provider.
+2. **Corporate OAuth 2.0** (local network only) — talks to the in-house OAuth2 server
+   bundled in `auth_server/oauth2_server.py`. No internet, no TOTP — the local server owns
+   user management.
 
-Beide stappen moeten slagen voordat een sessie volledig geactiveerd wordt.
+Each path is implemented by its own Flask Blueprint; the two never share OAuth code.
+A **third provider** can be added by dropping in a new `auth_xxx.py` blueprint —
+no changes to existing files are required apart from registering the new blueprint in `app.py`.
 
 ---
 
-## Stroomdiagram
+## File layout
+
+```
+presentations/
+  routes/
+    auth_routes.py        shared: /auth/login, /auth/logout, /auth/totp-*
+    auth_google.py        Google OAuth — self-contained: init + /auth/google + /auth/callback
+    auth_corporate.py     Corporate OAuth — self-contained: /auth/corporate/start + /auth/corporate/callback
+  services/
+    totp_service.py       TOTP helpers (secret, QR, verify)
+    user_store.py         user persistence (data/users.json)
+  templates/auth/
+    login.html            two-button login page
+    totp_setup.html       QR-code enrollment screen
+    totp_verify.html      6-digit code prompt
+
+auth_server/
+  oauth2_server.py        the in-house OAuth2 Authorization Server (localhost:5500)
+```
+
+---
+
+## URL map
+
+| URL | Owner | Purpose |
+|---|---|---|
+| `/auth/login` | `auth_routes` | login page with both provider buttons |
+| `/auth/logout` | `auth_routes` | clears the session |
+| `/auth/google` | `auth_google` | starts Google OAuth flow |
+| `/auth/callback` | `auth_google` | receives Google's redirect (URL fixed so Google Console doesn't need re-registering) |
+| `/auth/totp-setup` | `auth_routes` | first-time TOTP enrollment (Google flow only) |
+| `/auth/totp-verify` | `auth_routes` | TOTP code prompt on subsequent logins (Google flow only) |
+| `/auth/corporate/start` | `auth_corporate` | starts Corporate OAuth flow |
+| `/auth/corporate/callback` | `auth_corporate` | receives the local OAuth server's redirect |
+
+---
+
+## Flow 1 — Google OAuth + TOTP
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         BROWSER / GEBRUIKER                         │
+│                        BROWSER / USER                               │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
-                   Bezoekt /auth/login
+                  Visits /auth/login,
+              clicks "Continue with Google"
                             │
                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        STAP 1 – GOOGLE OAUTH                        │
-└─────────────────────────────────────────────────────────────────────┘
+                    GET /auth/google
+              (authlib generates state + nonce)
                             │
-            Klikt "Continue with Google"
-                            │
+                            │  302 → accounts.google.com
                             ▼
-                     GET /auth/google
-                 (genereert state + nonce)
-                            │
-                            │  redirect
-                            ▼
-               ┌────────────────────────┐
-               │  Google OAuth consent  │
-               │  accounts.google.com   │
-               └────────────┬───────────┘
-                            │
-               Gebruiker geeft toestemming
-                            │
-                            ▼
-              GET /auth/callback?code=...
-                            │
-                 Authlib wisselt code in
-                  voor ID-token bij Google
-                            │
-                  Extraheert uit token:
-                  • sub (Google user-ID)
-                  • email
-                  • name
-                            │
+                ┌────────────────────────┐
+                │  Google OAuth consent  │
+                │  accounts.google.com   │
+                └────────────┬───────────┘
+                             │
+                  User grants access
+                             │
+                             ▼
+              GET /auth/callback?code=…&state=…
+                             │
+                  authlib exchanges code for ID-token,
+                  extracts: sub, email, name
+                             │
                   upsert_user() → data/users.json
-                  (aanmaken of bijwerken)
-                            │
-              session["oauth_pending"] = google_sub
-                            │
-              ┌─────────────┴──────────────┐
-              │                            │
-     totp_enrolled == True        totp_enrolled == False
-              │                            │
-              ▼                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        STAP 2A – TOTP VERIFY                        │
-│                   (bestaande gebruiker, al ingeschreven)            │
-└─────────────────────────────────────────────────────────────────────┘
-        GET /auth/totp-verify
-        Toont invoerveld voor 6-cijferige code
-                 │
-         Gebruiker vult code in
-                 │
-        POST /auth/totp-verify
-        verify_totp(secret, code)  ← uit users.json
-                 │
-        ┌────────┴────────┐
-        │                 │
-      Fout             Correct
-        │                 │
-    Toon fout      _complete_login()
-                         │
-                         ▼
-              ┌──────────────────────┐
-              │  Sessie geactiveerd  │  ◄───────────────────┐
-              │  session["username"] │                      │
-              │  session["role"]     │                      │
-              │  session["google_sub"]                      │
-              └──────────┬───────────┘                      │
-                         │                                  │
-                  Redirect naar home                        │
-                                                            │
-┌─────────────────────────────────────────────────────────────────────┐
-│                        STAP 2B – TOTP SETUP                         │
-│                   (nieuwe gebruiker, eerste keer)                   │
-└─────────────────────────────────────────────────────────────────────┘
-        GET /auth/totp-setup
-        • Genereert willekeurige TOTP-geheime sleutel
-        • Toont QR-code om in te scannen
-        • Toont ook handmatige invoersleutel
-                 │
-         Gebruiker scant QR-code
-         en vult 6-cijferige code in
-                 │
-        POST /auth/totp-setup
-        verify_totp(generated_secret, code)
-                 │
-        ┌────────┴────────┐
-        │                 │
-      Fout             Correct
-        │                 │
-    Toon fout    enroll_totp() → slaat secret op in users.json
-                 totp_enrolled = True
-                         │
-                  _complete_login() ─────────────────────────►
+                             │
+                session["oauth_pending"] = google_sub
+                             │
+              ┌──────────────┴───────────────┐
+              │                              │
+     totp_enrolled == True            totp_enrolled == False
+              │                              │
+              ▼                              ▼
+   GET /auth/totp-verify           GET /auth/totp-setup
+   prompts 6-digit code            generates secret + QR
+              │                              │
+   POST /auth/totp-verify          POST /auth/totp-setup
+   totp_service.verify(…)          totp_service.verify(…),
+              │                    enroll_totp() saves to users.json
+              │                              │
+              └──────────────┬───────────────┘
+                             ▼
+                    _complete_login(user)
+                  session["username"], …, ["google_sub"]
+                             │
+                             ▼
+                   Redirect → home page
 ```
 
 ---
 
-## Componentbeschrijving
+## Flow 2 — Corporate OAuth (no TOTP)
 
-### Routes (`presentations/routes/auth_routes.py`)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        BROWSER / USER                               │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │
+                Clicks "Continue with Corporate Account"
+                            │
+                            ▼
+                GET /auth/corporate/start
+                            │
+            ┌───────────────┴────────────────┐
+            │                                │
+   local server reachable?         not reachable
+            │                                │
+            ▼                                ▼
+  session["corporate_oauth_state"]    render error.html
+       = random uuid                  HTTP 503 "OAuth Server Not Available"
+            │
+            │  302 → http://localhost:5500/oauth/authorize?…
+            ▼
+   ┌────────────────────────────┐
+   │  oauth2_server.py login    │
+   │  (in-house, local network) │
+   └────────────┬───────────────┘
+                │
+       User enters credentials
+                │
+                ▼
+   GET /auth/corporate/callback?code=…&state=…
+                │
+       state matches session?            no → flash "CSRF" → /auth/login
+                │ yes
+                ▼
+       POST /oauth/token   (client_id + client_secret via HTTP Basic)
+                │
+       GET  /api/userinfo  (Bearer token)
+                │
+       any HTTP error?                   yes → error.html (503)
+                │ no
+                ▼
+   session.clear()
+   session["username"]    = username
+   session["role"]        = "user"
+   session["auth_source"] = "corporate"
+                │
+                ▼
+        Redirect → home page
+```
 
-| Route | Methode | Beschrijving |
+The corporate flow performs **no internet calls**. The local `oauth2_server.py`
+owns corporate users — the app keeps **no record** of them in `users.json`.
+
+---
+
+## Session states
+
+```
+[Not logged in]
+      │
+      │  (Google flow)
+      ▼
+[oauth_pending]   session["oauth_pending"] = google_sub
+      │
+      │  TOTP succeeded
+      ▼
+[Logged in]       session["username"], ["role"], ["google_sub"]
+
+
+[Not logged in]
+      │
+      │  (Corporate flow) — single step, no intermediate state
+      ▼
+[Logged in]       session["username"], ["role"], ["auth_source"] = "corporate"
+```
+
+The `@login_required` decorator in `auth_routes.py` simply checks
+`"username" in session` — both providers populate that field, so downstream
+routes treat both kinds of users identically.
+
+---
+
+## Components
+
+### `presentations/routes/auth_routes.py` — shared
+
+| Route | Method | Purpose |
 |---|---|---|
-| `/auth/login` | GET | Loginpagina; redirect naar home als al ingelogd |
-| `/auth/google` | GET | Start Google OAuth-stroom |
-| `/auth/callback` | GET | Ontvangt code van Google, verwerkt token |
-| `/auth/totp-setup` | GET / POST | Eerste TOTP-inschrijving met QR-code |
-| `/auth/totp-verify` | GET / POST | TOTP-verificatie voor bestaande gebruikers |
-| `/auth/logout` | GET | Wist sessie |
+| `/auth/login` | GET | Login page; redirects to home if already logged in |
+| `/auth/logout` | GET | `session.clear()`, redirect to login |
+| `/auth/totp-setup` | GET / POST | First-time TOTP enrollment (QR code) |
+| `/auth/totp-verify` | GET / POST | TOTP code prompt for existing users |
 
-### Service (`presentations/services/auth_service.py`)
+Also defines `@login_required` and the `_complete_login()` helper.
 
-| Functie | Beschrijving |
+### `presentations/routes/auth_google.py` — Google only
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/auth/google` | GET | Redirect to Google's consent screen via authlib |
+| `/auth/callback` | GET | Receive Google's redirect, look up user, route to TOTP |
+
+Also exposes `init(app)`, called once from `create_app()` to register the
+authlib Google client with `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
+### `presentations/routes/auth_corporate.py` — Corporate only
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/auth/corporate/start` | GET | Probe server reachability, then 302 to `oauth2_server` |
+| `/auth/corporate/callback` | GET | Validate state, exchange code, fetch userinfo, log user in |
+
+Includes `_is_server_reachable()` and `_server_unavailable_page()` for the
+503 error page when `oauth2_server.py` is not running.
+
+### `presentations/services/totp_service.py`
+
+| Function | Purpose |
 |---|---|
-| `init_oauth(app)` | Configureert Authlib met Google OpenID Connect |
-| `generate_totp_secret()` | Genereert willekeurige base32-sleutel via `pyotp` |
-| `get_totp_uri(secret, email)` | Maakt provisioning-URI voor QR-code |
-| `verify_totp(secret, code)` | Valideert 6-cijferige code (±30 s tolerantie) |
-| `qr_code_base64(uri)` | Geeft base64-gecodeerde PNG terug voor weergave in HTML |
+| `generate_secret()` | Random base32 secret via `pyotp` |
+| `provisioning_uri(secret, email)` | Provisioning URI for QR-code rendering |
+| `verify(secret, code)` | Validates 6-digit code (±30 s tolerance) |
+| `qr_code_base64(uri)` | PNG QR code as base64 for inline HTML |
 
-### Gebruikersopslag (`presentations/services/user_store.py`)
+### `presentations/services/user_store.py`
 
-Sla op in `data/users.json` (thread-safe met `threading.Lock`):
+Thread-safe JSON-backed store in `data/users.json`. Keys are Google `sub`
+identifiers. **Corporate users are not stored here** — the local OAuth
+server owns them.
 
 ```json
 {
-  "google_sub": "1234567890",
-  "email": "gebruiker@gmail.com",
-  "name": "Jan Jansen",
+  "google_sub": "117657466979844859441",
+  "email": "user@example.com",
+  "name": "Some User",
   "role": "user",
-  "totp_secret": "BASE32SECRET...",
+  "totp_secret": "BASE32SECRET…",
   "totp_enrolled": true
 }
 ```
 
 ---
 
-## Sessiestaten
+## Environment variables
 
-```
-[Niet ingelogd]
-      │
-      │  Na succesvolle OAuth-callback
-      ▼
-[oauth_pending]  →  session["oauth_pending"] = google_sub
-      │
-      │  Na succesvolle TOTP-verificatie / setup
-      ▼
-[Volledig ingelogd]  →  session["username"], session["role"], session["google_sub"]
-```
+| Variable | Used by | Default |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | `auth_google.init()` | *required* |
+| `GOOGLE_CLIENT_SECRET` | `auth_google.init()` | *required* |
+| `FLASK_SECRET_KEY` | Flask session signing | `"dev-only-change-in-prod"` |
+| `FLASK_RUN_HOST` | Flask CLI | `127.0.0.1` (set to `localhost` for Google) |
+| `FLASK_RUN_PORT` | Flask CLI | `5000` (set to `5001` to match Google Console) |
+| `CORPORATE_OAUTH2_SERVER` | `auth_corporate` | `http://localhost:5500` |
+| `CORPORATE_OAUTH2_CLIENT_ID` | `auth_corporate` | `demo-client` |
+| `CORPORATE_OAUTH2_CLIENT_SECRET` | `auth_corporate` | `demo-secret-123` |
 
-De decorator `@login_required` controleert of `session["username"]` aanwezig is. Ontbreekt dat, dan redirect naar `/auth/login`.
+`set_env.sh` exports the Google credentials and Flask host/port for local dev;
+`./run.sh` sources it and launches Flask.
 
----
-
-## Benodigde omgevingsvariabelen
-
-| Variabele | Beschrijving |
-|---|---|
-| `GOOGLE_CLIENT_ID` | OAuth client-ID van Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | OAuth client-secret van Google Cloud Console |
-| `FLASK_SECRET_KEY` | Geheime sleutel voor Flask-sessies (verplicht in productie) |
-
-De geautoriseerde redirect-URI in Google Cloud Console moet zijn:
+The authorized redirect URI registered in Google Cloud Console must be:
 ```
 http://localhost:5001/auth/callback
 ```
 
 ---
 
-## Afhankelijkheden
+## Adding a third OAuth provider
 
-| Pakket | Gebruik |
+1. Create `presentations/routes/auth_xxx.py` with a `Blueprint("xxx_auth", …)`
+   defining `/start` and `/callback`.
+2. Register it in `presentations/app.py`:
+   ```python
+   from presentations.routes import auth_xxx
+   app.register_blueprint(auth_xxx.bp)
+   ```
+3. Add a button to `presentations/templates/auth/login.html`:
+   ```html
+   <a class="btn btn-outline-…" href="{{ url_for('xxx_auth.start') }}">
+     Continue with XXX
+   </a>
+   ```
+
+Existing providers stay untouched.
+
+---
+
+## Dependencies
+
+| Package | Used by |
 |---|---|
-| `authlib` | OAuth 2.0 / OpenID Connect client |
-| `pyotp` | TOTP-generatie en -verificatie |
-| `qrcode[pil]` | QR-code generatie als PNG |
-| `flask` | Sessie- en routebeheer |
+| `authlib` | Google OAuth client |
+| `requests` | Corporate OAuth client |
+| `pyotp` | TOTP secret + verification |
+| `qrcode[pil]` | QR code rendering |
+| `flask` | sessions, routes, blueprints |
