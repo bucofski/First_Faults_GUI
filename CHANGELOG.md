@@ -7,6 +7,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Corporate OAuth 2.0 login** alongside Google. New blueprint `presentations/routes/auth_corporate.py`
+  talks only to the in-house OAuth server (`auth_server/oauth2_server.py`) — no internet calls, no TOTP.
+- "Continue with Corporate Account" button on the login page.
+- Reachability probe before redirecting to the corporate server; if the server is offline the user sees
+  a 503 error page ("OAuth Server Not Available") instead of a browser connection error.
+- `auth_server/oauth2_server.py`: the in-house OAuth2 Authorization Server (demo + corporate users).
+- `presentations/services/totp_service.py`: extracted TOTP helpers (secret/QR/verify/uri).
+- `presentations/routes/auth_google.py`: Google OAuth blueprint with its own `init()`; mirrors the
+  corporate blueprint structure.
+- `run.sh`: launcher that sources `set_env.sh` and starts Flask on `localhost:5001` so the redirect URI
+  matches what Google Cloud Console has registered.
+- Auto-loader in `app.py` that reads `set_env.sh` so the app starts without a manual `source` step.
+
+### Changed
+- `auth_server/oauth2_server.py` HTML templates refactored to match First Faults' Bootstrap 5.3.2 look
+  (dark navbar, card-based forms, `#f8f9fa` background); login texts translated NL → EN.
+- Authentication code split into one blueprint per provider; `auth_routes.py` now only handles shared
+  concerns (login page, TOTP enrollment/verification, logout).
+- Login template loops over no provider abstractions — it has two explicit, hard-coded buttons so the
+  Google path and the corporate path are visibly independent.
+
+### Removed
+- `presentations/services/auth_service.py`: folded into `auth_google.py` (Google init) and
+  `totp_service.py` (TOTP).
+- `auth_server/oauth2_client.py`: standalone demo client, superseded by `auth_corporate.py`.
+
+### Fixed
+- `datetime.utcnow()` deprecation warnings in `oauth2_server.py`: replaced with timezone-aware
+  `datetime.now(UTC)` via a small `_now()` helper.
+- Google login `redirect_uri_mismatch` when Flask defaulted to `127.0.0.1:5000`: `set_env.sh` now
+  exports `FLASK_RUN_HOST=localhost` and `FLASK_RUN_PORT=5001`.
+
 ---
 
 ## [0.6.0] – 2026-04-19

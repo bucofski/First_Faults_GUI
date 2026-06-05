@@ -7,7 +7,7 @@ authors = ["Your Name <you@example.com>"]
 
 [server]
 host = "0.0.0.0"
-port = 8080
+port = 5001
 debug = true
 
 [logging]
@@ -35,6 +35,11 @@ enable_tracing = false
 [secrets]
 # Prefer environment variables, but allow defaults:
 jwt_secret = "${JWT_SECRET:-change-me}"
+
+[oauth.google]
+# Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as environment variables.
+# Obtain credentials at https://console.cloud.google.com/apis/credentials
+# Authorised redirect URI: http://localhost:5001/auth/callback
 
 [env.dev]
 server.debug = true

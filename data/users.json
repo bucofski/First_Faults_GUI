@@ -1,0 +1,12 @@
+{
+  "users": {
+    "117657466979844859441": {
+      "google_sub": "117657466979844859441",
+      "email": "benoit.goethals@gmail.com",
+      "name": "Dark Webster",
+      "role": "user",
+      "totp_secret": "L5UORP6K4GYLCYMEGJDAHGYDPIWRQTWM",
+      "totp_enrolled": true
+    }
+  }
+}

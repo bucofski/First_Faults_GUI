@@ -1,8 +1,6 @@
--- Drop function if it exists
-IF OBJECT_ID('dbo.fn_InterlockChain', 'TF') IS NOT NULL
-    DROP FUNCTION dbo.fn_InterlockChain;
-
-CREATE FUNCTION dbo.fn_InterlockChain (
+-- CREATE OR ALTER = single batch-safe statement; no separate DROP needed,
+-- so it deploys cleanly in any client (DBeaver/SSMS/sqlcmd) without GO.
+CREATE OR ALTER FUNCTION dbo.fn_InterlockChain (
     @TargetBSID INT = NULL,  -- Optional: If NULL, returns last N interlocks with their full trees
     @TopN INT = NULL,  -- If NULL, defaults to 100
     @FilterTimestampStart DATETIME = NULL,  -- Optional: Filter by timestamp range start (can be date or datetime)
@@ -15,7 +13,7 @@ AS
 RETURN
 (
     WITH AnchorInterlock AS (
-        SELECT DISTINCT TOP (ISNULL(@TopN, 100))
+        SELECT TOP (ISNULL(@TopN, 100))
             il.ID          AS AnchorID,
             il.TIMESTAMP   AS AnchorTimestamp,
             CAST(il.TIMESTAMP AS DATE) AS AnchorDate,
@@ -65,6 +63,7 @@ RETURN
         -- Level 0 = the anchor itself
         SELECT
             il.ID                              AS AnchorReference,
+            a.AnchorTimestamp                  AS AnchorTimestamp,
             0                                  AS Level,
             il.ID,
             il.TIMESTAMP,
@@ -89,6 +88,7 @@ RETURN
         -- Recursive: follow upstream (Level -1, -2, … toward root cause)
         SELECT
             uc.AnchorReference,
+            uc.AnchorTimestamp,
             uc.Level - 1,
             upstream_il.ID,
             upstream_il.TIMESTAMP,
@@ -114,6 +114,7 @@ RETURN
         -- Level 0 = same anchor starting point
         SELECT
             il.ID                              AS AnchorReference,
+            a.AnchorTimestamp                  AS AnchorTimestamp,
             0                                  AS Level,
             il.ID,
             il.TIMESTAMP,
@@ -138,6 +139,7 @@ RETURN
         -- Recursive: follow ONLY explicit UPSTREAM_INTERLOCK_LOG_ID links downward
         SELECT
             dc.AnchorReference,
+            dc.AnchorTimestamp,
             dc.Level + 1,
             downstream_il.ID,
             downstream_il.TIMESTAMP,
@@ -166,6 +168,7 @@ RETURN
     )
     SELECT
         cc.AnchorReference,
+        cc.AnchorTimestamp,
         cc.Date,
         cc.Level - MAX(cc.Level) OVER (PARTITION BY cc.AnchorReference) AS Level,
         cc.Direction,
