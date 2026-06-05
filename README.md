@@ -120,17 +120,70 @@ Gedefinieerd in `base.html`, beschikbaar op alle pagina's:
 **Vooruitgangsmoment:** 26 feb -> werkende query + eerste grafiek  
 **MVP:** 11 juni -> volledige flow + rapportage
 
-## 10. Runnen
+## 10. Authenticatie
+
+De applicatie ondersteunt **twee inlogmethodes** die naast elkaar staan op `/auth/login`:
+
+1. **Continue with Google** — Google OAuth 2.0 (internet) + TOTP 2FA (Google Authenticator / Authy).
+2. **Continue with Corporate Account** — in-house OAuth2-server (`auth_server/oauth2_server.py`, lokaal netwerk),
+   géén internet, géén TOTP. De lokale server beheert corporate-gebruikers.
+
+Elke provider is een aparte Flask Blueprint (`auth_google.py`, `auth_corporate.py`).
+Een derde provider toevoegen = één nieuw bestand + één regel in `app.py` + één knop in `login.html`.
+
+Zie [docs/oauth-totp-flow.md](docs/oauth-totp-flow.md) voor het volledige stroomdiagram, sessiestaten,
+en instructies om een extra provider toe te voegen.
+
+## 11. Runnen
+
+### Vereiste omgevingsvariabelen (in `set_env.sh`)
 
 ```bash
-flask --app app run --debug
+export GOOGLE_CLIENT_ID="YOUR_REAL_ID.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="YOUR_REAL_SECRET"
+export FLASK_SECRET_KEY="any-random-string-is-fine-for-dev"
+export FLASK_RUN_HOST="localhost"     # moet matchen met de redirect URI in Google Cloud Console
+export FLASK_RUN_PORT="5001"
 ```
 
-## 11. Documentatie
+Optioneel voor de corporate flow (defaults werken voor lokale ontwikkeling):
+```bash
+export CORPORATE_OAUTH2_SERVER="http://localhost:5500"
+export CORPORATE_OAUTH2_CLIENT_ID="demo-client"
+export CORPORATE_OAUTH2_CLIENT_SECRET="demo-secret-123"
+```
+
+### Hoofdapplicatie
+
+```bash
+./run.sh
+```
+
+Het `run.sh` script sourced `set_env.sh` en start `flask run` op `localhost:5001`,
+zodat de Google redirect URI matcht met wat in Google Cloud Console geregistreerd is
+(`http://localhost:5001/auth/callback`).
+
+### Corporate authenticatieserver (alleen voor de corporate login)
+
+In een tweede terminal:
+```bash
+.venv/bin/python auth_server/oauth2_server.py
+```
+
+De server draait op `http://localhost:5500`. Als hij niet bereikbaar is en je klikt
+op "Continue with Corporate Account", krijg je een nette 503-foutpagina ("OAuth Server
+Not Available") in plaats van een browserfout.
+
+Demo-accounts in de corporate server: `benoit` / `tom` (zie `USERS` in `oauth2_server.py`).
+
+## 12. Documentatie
 
 - [Diagrams pagina](docs/diagrams_page.md) – opbouw, spinner, selectieboxen, dataflow
 - [Table Tree pagina](docs/table_tree_page.md) – flow, boomstructuur, JavaScript, validatie
+- [OAuth + TOTP flow](docs/oauth-totp-flow.md) – Google + corporate login, sessiestaten, hoe een derde provider toevoegen
 - [Projectverloop](docs/project_verloop.md) – tijdlijn, Gantt chart, bereikte doelen per fase
+- [Presentatie NL](docs/FirstFaults_Presentatie_NL.pptx) – projectpresentatie in het Nederlands
+- [Presentation EN](docs/FirstFaults_Presentation.pptx) – project presentation in English
 
 ## Structure
 ![Project Structure](docs/ProjectStructureDiagram.png)

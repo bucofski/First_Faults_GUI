@@ -1,25 +1,45 @@
 import logging
+import os
 import tomllib
 from pathlib import Path
 
-from flask import Flask, render_template, url_for, redirect, session
+from flask import Flask, render_template, url_for, redirect
 
 from config.logging_config import setup_logging
 from presentations.routes import plc_routes
-from presentations.services.creadential import Role
-from presentations.services.credential_service import CredentialService
+from presentations.routes import auth_routes, auth_google, auth_corporate
 
-_auth_log = logging.getLogger("auth")
 _app_log = logging.getLogger("presentations")
 
 
+def _load_set_env_sh() -> None:
+    """Auto-load set_env.sh so the app starts without a manual `source` step."""
+    env_file = Path(__file__).resolve().parent.parent / "set_env.sh"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("export "):
+            continue
+        _, _, assignment = line.partition(" ")
+        key, _, value = assignment.partition("=")
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
 def create_app() -> Flask:
+    _load_set_env_sh()
     setup_logging()
 
-    app = Flask("app")
-    app.secret_key = "dev"
+    app = Flask(__name__)
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-in-prod")
     app.jinja_options["autoescape"] = True
+    app.register_blueprint(auth_routes.bp)        # shared: login page, TOTP, logout
+    app.register_blueprint(auth_google.bp)        # Google OAuth (internet + TOTP)
+    app.register_blueprint(auth_corporate.bp)     # Corporate (local oauth_server only)
     app.register_blueprint(plc_routes.bp)
+
+    auth_google.init(app)
 
     config_path = (Path(__file__).resolve().parent.parent / "config" / "config.toml")
 
@@ -36,17 +56,6 @@ def create_app() -> Flask:
     server_cfg = loaded.get("server", {})
     app.config["SERVER_HOST"] = server_cfg.get("host", "127.0.0.1")
     app.config["SERVER_PORT"] = server_cfg.get("port", 5000)
-
-    @app.before_request
-    def ensure_session_credentials():
-        cred = CredentialService.get_current_credential()
-        if cred is not None:
-            is_new_session = "username" not in session
-            session["username"] = cred.username
-            role_obj = cred.role
-            session["role"] = role_obj.value if role_obj is not None else Role.GUEST.value
-            if is_new_session:
-                _auth_log.info("Session started: user=%s role=%s", cred.username, session["role"])
 
     @app.errorhandler(404)
     def not_found(e):
@@ -83,6 +92,6 @@ def create_app() -> Flask:
 
     @app.route("/")
     def start():
-       return redirect(url_for("plc.home"))
+        return redirect(url_for("plc.home"))
 
     return app

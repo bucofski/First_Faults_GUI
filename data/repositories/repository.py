@@ -15,7 +15,7 @@ class InterlockRepository:
     """Repository for interlock data access using session context manager."""
 
     TVF_COLUMNS = (
-        "AnchorReference", "Date", "Level", "Direction", "Interlock_Log_ID",
+        "AnchorReference", "AnchorTimestamp", "Date", "Level", "Direction", "Interlock_Log_ID",
         "TIMESTAMP", "PLC", "BSID", "Interlock_Message",
         "TYPE", "BIT_INDEX", "Condition_Mnemonic", "Condition_Message",
         "UPSTREAM_INTERLOCK_REF", "Status"
@@ -56,9 +56,9 @@ class InterlockRepository:
         stmt = (
             select(interlock_func)
             .order_by(
+                interlock_func.c.AnchorTimestamp.desc(),
                 interlock_func.c.AnchorReference.desc(),
                 interlock_func.c.Level.desc(),
-                interlock_func.c.TIMESTAMP
             )
             .suffix_with("OPTION (RECOMPILE)")
         )

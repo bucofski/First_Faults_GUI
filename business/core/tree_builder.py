@@ -16,7 +16,7 @@ class InterlockTreeBuilder:
 
         trees = []
 
-        for anchor_ref, chain_df in df.groupby("AnchorReference"):
+        for anchor_ref, chain_df in df.groupby("AnchorReference", sort=False):
             root = InterlockTreeBuilder._build_chain_tree(chain_df)
             if root:
                 trees.append(root)
