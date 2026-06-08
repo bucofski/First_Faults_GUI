@@ -11,6 +11,8 @@ from datetime import datetime
 import sys
 from pathlib import Path
 
+from data.repositories import repository
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -332,7 +334,7 @@ def test_repository_layer():
 
         # Test connection
         print("\n📊 Testing repository connection...")
-        if repo.test_connection():
+        if repository.test_connection():
             print("✅ Repository connection successful")
         else:
             print("❌ Repository connection failed")

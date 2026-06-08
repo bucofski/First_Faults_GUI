@@ -11,6 +11,19 @@ from data.repositories.DB_Connection import get_session
 logger = logging.getLogger(__name__)
 
 
+def test_connection() -> bool:
+    """Test database connection."""
+    try:
+        with get_session() as session:
+            result = session.execute(select(func.db_name().label("CurrentDatabase")))
+            row = result.fetchone()
+            print(f"✓ Connection successful! Database: {row.CurrentDatabase}")
+            return True
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return False
+
+
 class InterlockRepository:
     """Repository for interlock data access using session context manager."""
 
@@ -67,14 +80,3 @@ class InterlockRepository:
             result = session.execute(stmt)
             return pd.DataFrame(result.fetchall(), columns=result.keys())
 
-    def test_connection(self) -> bool:
-        """Test database connection."""
-        try:
-            with get_session() as session:
-                result = session.execute(select(func.db_name().label("CurrentDatabase")))
-                row = result.fetchone()
-                print(f"✓ Connection successful! Database: {row.CurrentDatabase}")
-                return True
-        except Exception as e:
-            print(f"❌ Connection failed: {e}")
-            return False

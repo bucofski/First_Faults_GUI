@@ -26,9 +26,9 @@ CLIENTS = {
         "client_secret": "demo-secret-123",
         "redirect_uris": [
             "http://localhost:5001/callback",                      # standalone oauth2_client.py demo
-            "http://localhost:5000/auth/corporate/callback",       # First Faults GUI (flask run default)
+            "http://localhost:5002/auth/corporate/callback",       # First Faults GUI (flask run default)
             "http://localhost:5001/auth/corporate/callback",       # First Faults GUI (config.toml port)
-            "http://127.0.0.1:5000/auth/corporate/callback",       # First Faults GUI (127.0.0.1 variant)
+            "http://127.0.0.1:5002/auth/corporate/callback",       # First Faults GUI (127.0.0.1 variant)
             "http://127.0.0.1:5001/auth/corporate/callback",       # First Faults GUI (127.0.0.1 variant)
         ],
         "name": "First Faults GUI"

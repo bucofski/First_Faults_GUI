@@ -64,7 +64,7 @@ def _build_odbc_connect_string(conn_config: dict) -> str:
 _engine: Engine | None = None
 
 
-def get_engine() -> Engine:
+def get_engine() -> Engine | None:
     """Get or create the global engine instance (singleton)."""
     global _engine
     if _engine is None:

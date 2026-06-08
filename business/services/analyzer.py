@@ -17,9 +17,7 @@ class InterlockService:
         self.repository = repository or InterlockRepository()
         self.tree_builder = tree_builder or InterlockTreeBuilder()
 
-    def test_connection(self) -> bool:
-        """Test database connection."""
-        return self.repository.test_connection()
+
 
     def analyze_interlock(
             self,
