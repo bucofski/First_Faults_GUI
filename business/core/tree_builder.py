@@ -52,7 +52,7 @@ class InterlockTreeBuilder:
         level_data = chain_df[chain_df["Level"] == level]
         first_row = level_data.iloc[0]
 
-        condition_mnemonic = first_row.get("Condition_Mnemonic")
+        condition_mnemonic : Any = first_row.get("Condition_Mnemonic")
         if pd.isna(condition_mnemonic) or str(condition_mnemonic).strip() == "":
             condition_mnemonic = first_row.get("Condition_Message")
 

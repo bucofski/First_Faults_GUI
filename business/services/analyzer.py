@@ -1,7 +1,6 @@
 """Main analyzer orchestrating the interlock analysis workflow."""
 from datetime import datetime
 
-from business.core.formatters import ResultFormatter, DictionaryResultFormatter
 from business.core.tree_builder import InterlockTreeBuilder
 from data.model.models import InterlockNode
 from data.repositories.repository import InterlockRepository
@@ -27,12 +26,8 @@ class InterlockService:
             filter_timestamp_end: datetime | None = None,
             filter_condition_message: str | None = None,
             filter_plc: str | None = None,
-            formatter: ResultFormatter | None = None
     ) -> list[InterlockNode]:
         """Perform complete interlock analysis."""
-        if formatter is None:
-            formatter = DictionaryResultFormatter()
-
         df = self.repository.get_interlock_chain(
             target_bsid=target_bsid,
             top_n=top_n,

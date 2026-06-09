@@ -168,3 +168,7 @@ cython_debug/
 config/Connection.yaml
 uv.lock
 /data/users.json
+
+# Claude Code
+CLAUDE.md
+.claude/
