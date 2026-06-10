@@ -15,7 +15,7 @@ def print_section(title):
 def main():
     # Configure your connection string
     connection_string = "mssql+pyodbc://user:pass@server/First_Fault?driver=ODBC+Driver+17+for+SQL+Server"
-    snapshot_mgr = TrendSnapshotManager(connection_string)
+    snapshot_mgr = TrendSnapshotManager()
 
     # === 1. Stabilizing Faults ===
     print_section("STABILIZING FAULTS (Last 4 Weeks)")

@@ -10,6 +10,23 @@ from data.repositories.DB_Connection import get_session
 
 logger = logging.getLogger(__name__)
 
+# SQL's TOP has no "unlimited" keyword and fn_InterlockChain's @TopN is an INT,
+# so the maximum INT value is used to effectively remove the row cap.
+_UNLIMITED_TOP_N = 2_000
+
+
+def test_connection() -> bool:
+    """Test database connection."""
+    try:
+        with get_session() as session:
+            result = session.execute(select(func.db_name().label("CurrentDatabase")))
+            row = result.fetchone()
+            print(f"✓ Connection successful! Database: {row.CurrentDatabase}")
+            return True
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return False
+
 
 class InterlockRepository:
     """Repository for interlock data access using session context manager."""
@@ -35,7 +52,10 @@ class InterlockRepository:
 
         Args:
             target_bsid: Optional BSID. If NULL, returns last interlocks with their full trees
-            top_n: Number of results to return (default in SQL: 10). If None, uses SQL default
+            top_n: Number of anchor interlocks to return. If None, the SQL function
+                defaults to 100; when both filter_timestamp_start and
+                filter_timestamp_end are set, the cap is lifted to return all
+                interlocks within the range
             filter_timestamp_start: Optional filter by timestamp range start
             filter_timestamp_end: Optional filter by timestamp range end
             filter_condition_message: Optional search text in condition message
@@ -44,6 +64,12 @@ class InterlockRepository:
         Returns:
             DataFrame with interlock chain data
         """
+        # A start + end date range already bounds the result set, so drop the default
+        # TOP cap and return every interlock within that range. An explicitly
+        # provided top_n still takes precedence.
+        if top_n is None and filter_timestamp_start is not None and filter_timestamp_end is not None:
+            top_n = _UNLIMITED_TOP_N
+
         interlock_func = func.dbo.fn_InterlockChain(
             target_bsid,
             top_n,
@@ -53,11 +79,19 @@ class InterlockRepository:
             filter_plc
         ).table_valued(*self.TVF_COLUMNS)
 
+        # When a start timestamp filter is active, show results ascending (oldest
+        # first, starting at the start time and counting up). Without a start filter,
+        # keep the default newest-first ordering. The returned rows are identical
+        # either way; only the display order changes.
+        ascending = filter_timestamp_start is not None
+        anchor_timestamp = interlock_func.c.AnchorTimestamp
+        anchor_reference = interlock_func.c.AnchorReference
+
         stmt = (
             select(interlock_func)
             .order_by(
-                interlock_func.c.AnchorTimestamp.desc(),
-                interlock_func.c.AnchorReference.desc(),
+                anchor_timestamp.asc() if ascending else anchor_timestamp.desc(),
+                anchor_reference.asc() if ascending else anchor_reference.desc(),
                 interlock_func.c.Level.desc(),
             )
             .suffix_with("OPTION (RECOMPILE)")
@@ -67,14 +101,3 @@ class InterlockRepository:
             result = session.execute(stmt)
             return pd.DataFrame(result.fetchall(), columns=result.keys())
 
-    def test_connection(self) -> bool:
-        """Test database connection."""
-        try:
-            with get_session() as session:
-                result = session.execute(select(func.db_name().label("CurrentDatabase")))
-                row = result.fetchone()
-                print(f"✓ Connection successful! Database: {row.CurrentDatabase}")
-                return True
-        except Exception as e:
-            print(f"❌ Connection failed: {e}")
-            return False

@@ -55,7 +55,7 @@ def create_app() -> Flask:
 
     server_cfg = loaded.get("server", {})
     app.config["SERVER_HOST"] = server_cfg.get("host", "127.0.0.1")
-    app.config["SERVER_PORT"] = server_cfg.get("port", 5000)
+    app.config["SERVER_PORT"] = server_cfg.get("port", 5002)
 
     @app.errorhandler(404)
     def not_found(e):

@@ -4,4 +4,4 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source ./set_env.sh
-exec .venv/bin/flask --app presentations.app run
+exec .venv/bin/flask --app presentations.app run --port "${1:-5002}"
