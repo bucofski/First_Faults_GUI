@@ -47,17 +47,21 @@ Regeltechniekers, lijnverantwoordelijken, productiebedienden bij Arcelor die CIM
 ### Lagenstructuur
 
 ```
-presentations/          UI-laag (Flask Blueprint, templates, services)
-  plc.py                Routes (Blueprint "plc")
+presentations/          UI-laag (Flask app, blueprints, templates, services)
+  app.py                create_app() — registreert blueprints, config, errorhandlers
+  routes/               Blueprints: plc_routes, auth_routes, auth_google, auth_corporate
   templates/            Jinja2 HTML-templates
   services/             View-services (DiagramService, DiagramPdfService, PdfGenerator)
+                        + auth-helpers (totp_service, user_store)
 
 business/               Business-laag
-  services/             InterlockService, FaultCountService
+  services/             InterlockService (analyzer)
+  core/                 FaultCountService, InterlockTreeBuilder
 
 data/                   Data-laag
-  repositories/         SnapshotRepository, DB_Connection
-  orm/                  SQLAlchemy ORM-modellen
+  repositories/         InterlockRepository, SnapshotRepository, DB_Connection
+  model/                Domain models (dataclasses)
+  orm/                  SQLAlchemy ORM-modellen (reporting_orm)
 ```
 
 ### Flow:
