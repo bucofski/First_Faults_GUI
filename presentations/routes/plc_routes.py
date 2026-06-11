@@ -127,12 +127,6 @@ def home():
     )
 
 
-@bp.route("/table")
-@login_required
-def table():
-    return render_template("table.html", title="Table", data=None)
-
-
 @bp.route("/about")
 @login_required
 def about():
