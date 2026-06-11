@@ -1,71 +1,92 @@
-@startuml High-level Architecture
+@startuml HighLevelArchitectureDiagram
 
 skinparam componentStyle uml2
 skinparam backgroundColor white
-skinparam handwritten false
 
 title First_Faults_GUI - High-level Architectuur
 
 actor "Gebruiker" as user
 
 package "Presentation Layer" <<Frame>> #LightBlue {
-    [Flask Web App\n(plc.py)] as flask
-    [Templates (Jinja2)] as templates
-    [Static Assets] as static
+    [Flask App\n(app.py / create_app)] as flask
+
+    package "Routes (Blueprints)" #AliceBlue {
+        [plc_routes] as plcroutes
+        [auth_routes\n(login, TOTP, logout)] as authroutes
+        [auth_google\n(Google OAuth)] as authgoogle
+        [auth_corporate] as authcorp
+    }
+
     [DiagramService] as diagram
     [DiagramPdfService] as diagrampdf
     [PdfGenerator] as pdf
-    [CredentialService] as cred
+    [totp_service] as totp
+    [user_store] as userstore
+
+    [Templates (Jinja2)] as templates
+    [Static Assets] as static
 }
 
 package "Business Layer" <<Frame>> #LightGreen {
     [InterlockService\n(analyzer.py)] as analyzer
     [FaultCountService] as faultcount
-    [TreeBuilder] as tree
-    [Formatters] as formatters
-    [MailService] as mail
+    [InterlockTreeBuilder] as tree
 }
 
 package "Data Layer" <<Frame>> #LightYellow {
     [InterlockRepository] as repo
     [SnapshotRepository] as snaprepo
-    [DB Connection] as dbconn
-    [Domain Models] as models
-    [ORM (reporting_orm)] as orm
+    [DB_Connection\n(engine / get_session)] as dbconn
+    [Domain Models\n(dataclasses)] as models
+    [reporting_orm\n(ORM models)] as orm
 }
 
+node "Corporate OAuth Server\n(auth_server/oauth2_server.py)" as oauthsrv #Wheat
+cloud "Google OAuth" as google #LightCyan
 database "SQL Server" as db #LightGray
 
-' Connections
+' User entry
 user --> flask : HTTP Request
-flask --> templates : renders
-flask --> static : serves
-flask --> diagram : chart HTML
-flask --> analyzer : interlock analysis
-flask --> pdf : interlock PDF
-flask --> diagrampdf : diagrams PDF
-flask --> cred : authentication
+flask --> plcroutes : registers
+flask --> authroutes : registers
+flask --> authgoogle : registers
+flask --> authcorp : registers
+
+' Rendering
+plcroutes --> templates : renders
+plcroutes --> static : serves
+
+' Auth flow
+authroutes --> totp : verify TOTP
+authroutes --> userstore : load/save users
+authgoogle --> userstore : load/save users
+authgoogle --> google : OAuth2
+authcorp --> oauthsrv : OAuth2
+
+' Feature services
+plcroutes --> analyzer : interlock analysis
+plcroutes --> faultcount : fault counts
+plcroutes --> diagram : chart HTML
+plcroutes --> diagrampdf : diagrams PDF
+plcroutes --> pdf : interlock PDF
 
 diagram --> snaprepo : read snapshots
 diagram --> faultcount : live fallback
-
 diagrampdf --> snaprepo : read snapshots
 diagrampdf --> faultcount : live fallback
+pdf --> models : reads InterlockNode
 
+' Business -> Data
 analyzer --> tree : builds trees
-analyzer --> formatters : formats output
 analyzer --> repo : fetches data
-analyzer --> models : creates
+tree --> models : creates nodes
+faultcount --> dbconn : get_session
+faultcount --> orm : queries RootCauseFault
 
-faultcount --> repo : fetches data
-faultcount --> models : creates
-
-tree --> models : creates InterlockNode
-
-repo --> dbconn : connection
-repo --> models : maps to
-snaprepo --> dbconn : connection
+repo --> dbconn : get_session
+snaprepo --> dbconn : get_session
 snaprepo --> orm : maps to
 dbconn --> db : SQL Queries
+oauthsrv --> db : (optional) user store
 
 @enduml
